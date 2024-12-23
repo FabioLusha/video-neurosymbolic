@@ -1,0 +1,51 @@
+version: '3'
+
+networks:
+  default:
+    name: ollama-network
+    external: true
+
+services:
+  ollama:
+    image: lusha/ollama
+    user: "${UID}:${GID}"
+    ports:
+      - "11434:11434"
+    volumes:
+      - /home/lusha/storage/ollama/ollama_models:/.ollama
+    container_name: lusha_ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["4"]
+              capabilities: [gpu]
+    cpuset: "32-35"
+    restart: "no"
+    networks:
+      - default
+
+  star_request_manager:
+    environment:
+      - OLLAMA_URL=http://lusha_ollama:11434
+    build: .
+    container_name: lusha_test_star
+    user: "${UID}:${GID}"
+    
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+              count: 0
+    depends_on:
+      - ollama
+    volumes:
+      - /home/lusha/storage/star_code/outputs:/app/outputs
+      - /home/lusha/storage/star_code/data:/app/data
+      - /home/lusha/datasets/private:/app/data/datasets
+      - /home/lusha/storage/star_code/src:/app/src
+    cpuset: "32-35"
+    networks:
+      - default
