@@ -13,12 +13,12 @@ def main():
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamRequestManager(
         base_url=OLLAMA_URL, 
-        model='llama3.2')
+        model='llama3.2',
+        num_ctx=8192) # increasing the context window
 
     # Generate 50 prompts and collect them in a list
     prompts = list(prompt_generator.generate())
-    prompt_generator.generate_and_save_prompts(output_dir='outputs')
-    # Save prompts and generate responses
+    # generate responses
     ollama.batch_requests(
         prompts=prompts,
         output_dir='outputs'

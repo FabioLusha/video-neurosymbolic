@@ -13,4 +13,5 @@ COPY src/ src/
 # Create directory for outputs
 RUN mkdir -p outputs
 
-CMD ["python", "src/main.py"]
+# run the script in unbuffered mode
+CMD ["python", "-u", "src/main.py"]

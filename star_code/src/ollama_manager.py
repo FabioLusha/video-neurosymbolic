@@ -6,9 +6,10 @@ from datetime import datetime
 
 class OllamRequestManager:
 
-    def __init__(self, model, base_url):
+    def __init__(self, model, base_url, **options):
         self.base_url = base_url
         self.model = model
+        self.options = options
 
     def make_request(self, prompt):
         try:
@@ -18,7 +19,8 @@ class OllamRequestManager:
                     'model': self.model,
                     'prompt': prompt,
                     # Set to False to get full response at once
-                    'stream': False
+                    'stream': False,
+                    'options': self.options
                 }
             )
 
@@ -51,8 +53,7 @@ class OllamRequestManager:
         print("============== Starting Response Generation ==============")
 
         # Using line buffering
-        with open(output_file, 'w', buffering=1, encoding='utf-8') as f, \
-                open(error_file, 'w', buffering=1, encoding='utf-8') as error_f:
+        with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
 
             consecutive_errors = 0
             error = False
@@ -79,26 +80,27 @@ class OllamRequestManager:
                         consecutive_errors = 0
 
                 except Exception as e:
-                    error_msg = {
-                        'qid': id,
-                        'prompt': prompt,
-                        'error': str(e),
-                        'timestamp': datetime.now().isoformat()
-                    }
-
-                    error_f.write(
-                        json.dumps(error_msg, indent=2, ensure_ascii=False))
-                    error_f.flush()
-
-                    print(f"Error at iteration {i}\n"
-                          f"Prompt id:{id}\n"
-                          f"Look at the log file for specifics on the error"
-                          )
-
                     if error:
                         consecutive_errors += 1
 
                     error = True
+                
+                    with open(error_file, 'w', buffering=1, encoding='utf-8') as error_f:
+                        error_msg = {
+                            'qid': id,
+                            'prompt': prompt,
+                            'error': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        }
+
+                        error_f.write(
+                            json.dumps(error_msg, indent=2, ensure_ascii=False))
+                        error_f.flush()
+
+                        print(f"Error at iteration {i}\n"
+                              f"Prompt id:{id}\n"
+                              f"Look at the log file for specifics on the error"
+                              )
 
                 finally:
                     if consecutive_errors > 5:
