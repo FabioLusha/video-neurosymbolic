@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 
-class OllamRequestManager:
+class OllamaRequestManager:
 
     def __init__(self, model, base_url, **options):
         self.base_url = base_url
