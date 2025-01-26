@@ -1,4 +1,4 @@
-from ollama_manager import STARPromptGenerator, OllamRequestManager
+from ollama_manager import STARPromptGenerator, OllamaRequestManager
 import os
 
 def main():
@@ -11,12 +11,14 @@ def main():
     
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-    ollama = OllamRequestManager(
+    ollama = OllamaRequestManager(
         base_url=OLLAMA_URL, 
         model='llama3.2',
-        num_ctx=8192) # increasing the context window
+        num_ctx=8192,     # increasing the context window
+        temperature=0.1,   # less createive and more focuesed generation (default: 0.8)
+        num_predict=128,  # limits the number of tokens the LLM can generate as response -> useful to not fill context window
+        ) 
 
-    # Generate 50 prompts and collect them in a list
     prompts = list(prompt_generator.generate())
     # generate responses
     ollama.batch_requests(

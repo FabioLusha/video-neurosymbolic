@@ -1,4 +1,5 @@
 ollama/ollama_models
+ollama/logs
 star_code/data/datasets
 star_code/outputs
 star_code/models
