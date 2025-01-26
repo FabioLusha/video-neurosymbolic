@@ -1,7 +1,0 @@
-docker run -d --rm \
-    --gpus device=4 --cpuset-cpus 32-35 \
-    -p 11434:11434 \
-    -v $HOME/storage/ollama/ollama_models:/.ollama \
-    --user $(id -u):$(id -g) \
-    --name lusha_ollama_test \
-    lusha/ollama

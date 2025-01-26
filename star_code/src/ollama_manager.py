@@ -21,7 +21,8 @@ class OllamaRequestManager:
                     # Set to False to get full response at once
                     'stream': False,
                     'options': self.options
-                }
+                },
+                timeout=20
             )
 
             # Raise an exception for HTTP errors
@@ -32,7 +33,7 @@ class OllamaRequestManager:
 
         except requests.RequestException as e:
             print(f"Error making request to Ollama server: {e}")
-            return None
+            raise e
 
     def batch_requests(self, prompts, output_dir):
 

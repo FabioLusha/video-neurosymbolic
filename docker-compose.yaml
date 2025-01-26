@@ -6,10 +6,33 @@ networks:
     external: true
 
 services:
+  ollama:
+    image: lusha/ollama
+    environment:
+      - OLLAMA_LOG=debug
+      - OLLAMA_DEBUG=1
+    user: "${UID}:${GID}"
+    ports:
+      - "11434:11434"
+    volumes:
+      - /home/lusha/storage/ollama/ollama_models:/.ollama
+      - /home/lusha/storage/ollama/logs:/.ollama/logs
+    container_name: lusha_ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    cpuset: "12-15"
+    restart: "no"
+    networks:
+      - default
+
   star_request_manager:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
-      - PYTHONUNBUFFERED=1
     build: .
     container_name: lusha_test_star
     user: "${UID}:${GID}"
@@ -20,6 +43,8 @@ services:
           devices:
             - capabilities: [gpu]
               count: 0
+    depends_on:
+      - ollama
     volumes:
       - /home/lusha/storage/star_code/outputs:/app/outputs
       - /home/lusha/storage/star_code/data:/app/data
