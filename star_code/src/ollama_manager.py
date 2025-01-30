@@ -6,22 +6,22 @@ from datetime import datetime
 
 class OllamaRequestManager:
 
-    def __init__(self, model, base_url, **options):
+    def __init__(self, base_url, model, **opt_params):
         self.base_url = base_url
         self.model = model
-        self.options = options
+
+        # Setting some of the params to pass to ollama
+        self.params = opt_params
+        self.params['model'] = model
+        self.params['stream'] = False # Set to False to get full response at once
 
     def make_request(self, prompt):
         try:
+            # adding the prompt param to the other params
+            self.params['prompt'] = prompt
             response = requests.post(
                 f'{self.base_url}/api/generate',
-                json={
-                    'model': self.model,
-                    'prompt': prompt,
-                    # Set to False to get full response at once
-                    'stream': False,
-                    'options': self.options
-                },
+                json=self.params,
                 timeout=20
             )
 
@@ -32,8 +32,7 @@ class OllamaRequestManager:
             return response_data.get('response', '')
 
         except requests.RequestException as e:
-            print(f"Error making request to Ollama server: {e}")
-            raise e
+            raise Exception(f"Error making request to Ollama server: {e}")
 
     def batch_requests(self, prompts, output_dir):
 
@@ -105,9 +104,8 @@ class OllamaRequestManager:
 
                 finally:
                     if consecutive_errors > 5:
-                        raise Exception(
-                            "T_here have been {5} consecutive errors!\n"
-                            "The process has stopped!")
+                        raise Exception("There have been {5} consecutive errors!\n"
+                                        "The process has stopped!")
 
 
 class STARPromptGenerator:
