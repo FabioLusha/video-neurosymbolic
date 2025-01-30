@@ -33,7 +33,7 @@ def main():
         output_dir='outputs'
     )
 
-def _load_system_prompt(self, filename):
+def _load_system_prompt(filename):
     try:
         with open(filename) as in_file:
             return in_file.read().strip()
