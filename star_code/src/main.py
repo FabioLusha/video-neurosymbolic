@@ -4,19 +4,22 @@ import os
 def main():
     
 
-    system_prompt = _load_system_prompt('data/system_prompt.txt')
-    print(system_prompt)
-    prompt_format = "QUESTION: {question}\n"\
-                    "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
+    # system_prompt = _load_system_prompt('data/system_prompt.txt')
+    # prompt_format = "QUESTION: {question}\n"\
+    #                 "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
-    #prompt_format = system_prompt + '\n' + prompt_format
-
+    mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt.txt')
+    mcq_pformat = "Q: {question}\n"\
+                  "{c1}\n{c2}\n{c3}\n{c4}"\
+                  "STSG: {stsg}"\
+                  "A:"
+    
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamaRequestManager(
         base_url=OLLAMA_URL, 
         model='llama3.2',
-        system=system_prompt,
+        system=mcq_system_prompt,
         options={
             'num_ctx': 8192,     # increasing the context window
             'temperature': 0.1,  # less createive and more focuesed generation (default: 0.8)
@@ -29,7 +32,7 @@ def main():
         input_filename='data/datasets/STAR_question_and_stsg.json',
     )
     
-    prompts = list(prompt_generator.generate(prompt_format))
+    prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
     # generate responses
     ollama.batch_requests(
         prompts=prompts,

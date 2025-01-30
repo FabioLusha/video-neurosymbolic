@@ -112,7 +112,7 @@ class STARPromptGenerator:
     def __init__(self, input_filename):
         self.input_filename = input_filename
 
-    def generate(self, prompt_format, limit=None):
+    def generate(self, prompt_format, limit=None, mcq=False):
         """
         @prompt_format: a string wich needs to have the two idenifier {question} and {stsg}    
         """
@@ -129,6 +129,14 @@ class STARPromptGenerator:
                         stsg=str(sample['stsg'])
                     )
 
+                    if mcq:
+                        choices = [f"{key}. {val}" for key, val in sample['choices']]
+                        c1, c2, c3, c4 = choices
+                        prompt = prompt_format.format(
+                        question=sample['question'],
+                        c1=c1, c2=c2, c3=c3, c4=c4,
+                        stsg=str(sample['stsg'])
+                    )
                     yield {'qid': sample['question_id'], 'prompt': prompt}
 
         except IOError as e:
