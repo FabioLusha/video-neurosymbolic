@@ -1,10 +1,10 @@
 import json
 import sys
-sys.path.append('../')
+sys.path.append('../src')
 
 
 # noqa: E402 - disables the warning for this line
-from ollama_manager import STARPromptGenerator, OllamRequestManager  # noqa: E402
+from ollama_manager import STARPromptGenerator, OllamaRequestManager  # noqa: E402
 
 # Test data - creating a small JSON file with sample data
 test_data = [
@@ -29,19 +29,26 @@ with open('test_system_prompt.txt', 'w') as f:
 def main():
     # Initialize the generator
     generator = STARPromptGenerator(
-        input_filename='test_data.json',
-        system_prompt_filename='test_system_prompt.txt'
+        input_filename='test_data.json'
     )
 
+    prompt_format = "QUESTION: {question}\n"\
+                    "STSG: {stsg}"
+    
+    with open('test_system_prompt.txt', 'r') as f:
+          prompt_format = '\n'.join([f.read(), prompt_format])
+          
     # Initialize the Ollama manager
-    manager = OllamRequestManager(model="llama2")
+    manager = OllamaRequestManager(
+        model='llama2',
+        base_url='http://localhost:11434')
 
     # Create output directory
     output_dir = "test_output"
 
     # Get first 10 prompts
     prompts = []
-    for i, prompt in enumerate(generator.generate()):
+    for i, prompt in enumerate(generator.generate(prompt_format)):
         if i >= 10:
             break
         prompts.append(prompt)

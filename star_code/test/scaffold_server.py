@@ -15,7 +15,7 @@ async def generate(request: Request):
     """Handle generation requests"""
     try:
         body = await request.json()
-        logger.info(f"Received request with prompt: {body.get('prompt')}")
+        logger.info(f"Received request with prompt:\n {body.get('prompt')}")
         return {"response": "Hi, I am alive"}
 
     except Exception as e:

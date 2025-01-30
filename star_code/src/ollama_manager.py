@@ -111,35 +111,24 @@ class OllamaRequestManager:
 
 
 class STARPromptGenerator:
-    def __init__(self, input_filename, system_prompt_filename=None):
+    def __init__(self, input_filename):
         self.input_filename = input_filename
-        self.system_prompt = ''
 
-        if system_prompt_filename:
-            self.system_prompt = self._load_system_prompt(
-                system_prompt_filename)
-
-    def _load_system_prompt(self, filename):
-        try:
-            with open(filename) as in_file:
-                return in_file.read().strip()
-
-        except IOError as e:
-            raise IOError(f"Error reading system prompt file: {e}")
-
-    def generate(self, limit=None):
+    def generate(self, prompt_format, limit=None):
+        """
+        @prompt_format: a string wich needs to have the two idenifier {question} and {stsg}    
+        """
         try:
             with open(self.input_filename, 'r') as in_file:
                 q_stsg_data = json.load(in_file)
 
                 for i, sample in enumerate(q_stsg_data, 1):
-                    if limit is not None and i > limit:
+                    if limit and i > limit:
                         break
 
-                    prompt = (
-                        f"{self.system_prompt}\n\n"
-                        f"QUESTION: {sample['question']}\n"
-                        f"SPATIO-TEMPORAL SCENE-GRAPH: {str(sample['stsg'])}"
+                    prompt = prompt_format.format(
+                        question=sample['question'],
+                        stsg=str(sample['stsg'])
                     )
 
                     yield {'qid': sample['question_id'], 'prompt': prompt}
