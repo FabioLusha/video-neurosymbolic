@@ -110,7 +110,12 @@ class OllamaRequestManager:
 
 class STARPromptGenerator:
     def __init__(self, input_filename):
+        if not os.path.exists(input_filename):
+            raise OSError(f"No such file or directory: '{input_filename}'")
+        
         self.input_filename = input_filename
+
+        
 
     def generate(self, prompt_format, limit=None, mcq=False):
         """
@@ -141,26 +146,22 @@ class STARPromptGenerator:
         except IOError as e:
             raise IOError(f"Error reading question and stsg file: {e}")
 
-    def generate_and_save_prompts(self, output_dir, limit=None):
+    def generate_and_save_prompts(self, output_file, prompt_format, mcq=False, limit=None):
+        
         # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = os.path.join(
-            output_dir, f'prompts_{timestamp}.jsonl')
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
         try:
             # Open file with line buffering
             with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
-                for prompt_data in self.generate(limit):
+                for prompt_data in self.generate(prompt_format, limit, mcq):
                     # Write each prompt as a JSON line
                     f.write(json.dumps(prompt_data, ensure_ascii=False) + '\n')
                     f.flush()
 
                 print(f"Prompts saved to {output_file}")
 
-                return
+                return True
 
         except IOError as e:
-            raise IOError(f"Error saving prompts: {e}")
+            raise IOError(f"Error saving prompts") from e
