@@ -23,9 +23,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["4"]
+              device_ids: ["_"]
               capabilities: [gpu]
-    cpuset: "12-15"
+    cpuset: "0-3"
     restart: "no"
     networks:
       - default

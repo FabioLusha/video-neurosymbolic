@@ -124,19 +124,18 @@ class STARPromptGenerator:
                     if limit and i > limit:
                         break
 
-                    prompt = prompt_format.format(
-                        question=sample['question'],
-                        stsg=str(sample['stsg'])
-                    )
-
                     if mcq:
-                        choices = [f"{key}. {val}" for key, val in sample['choices']]
+                        choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
                         c1, c2, c3, c4 = choices
                         prompt = prompt_format.format(
-                        question=sample['question'],
-                        c1=c1, c2=c2, c3=c3, c4=c4,
-                        stsg=str(sample['stsg'])
-                    )
+                                        question=sample['question'],
+                                        c1=c1, c2=c2, c3=c3, c4=c4,
+                                        stsg=str(sample['stsg']))
+                    else:
+                        prompt = prompt_format.format(
+                                        question=sample['question'],
+                                        stsg=str(sample['stsg']))
+
                     yield {'qid': sample['question_id'], 'prompt': prompt}
 
         except IOError as e:

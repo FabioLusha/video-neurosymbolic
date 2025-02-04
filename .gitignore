@@ -4,3 +4,4 @@ star_code/data/datasets
 star_code/outputs
 star_code/models
 star_code/.env
+star_code/src/__pycache__

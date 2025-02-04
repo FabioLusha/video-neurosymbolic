@@ -10,8 +10,8 @@ def main():
 
     mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt.txt')
     mcq_pformat = "Q: {question}\n"\
-                  "{c1}\n{c2}\n{c3}\n{c4}"\
-                  "STSG: {stsg}"\
+                  "{c1}\n{c2}\n{c3}\n{c4}\n"\
+                  "STSG: {stsg}\n"\
                   "A:"
     
     # Initialize Ollama manager
@@ -29,7 +29,8 @@ def main():
     
     # Initialize the prompt generator
     prompt_generator = STARPromptGenerator(
-        input_filename='data/datasets/STAR_question_and_stsg.json',
+        # input_filename='data/datasets/STAR_question_and_stsg.json',    # Generative
+        input_filename='data/datasets/STAR_QA_and_stsg_val.json',    # MCQ
     )
     
     prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
