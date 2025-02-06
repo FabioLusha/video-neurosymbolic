@@ -84,7 +84,7 @@ class OllamaRequestManager:
 
                     error = True
                 
-                    with open(error_file, 'w', buffering=1, encoding='utf-8') as error_f:
+                    with open(error_file, 'a', buffering=1, encoding='utf-8') as error_f:
                         error_msg = {
                             'qid': id,
                             'prompt': prompt,
