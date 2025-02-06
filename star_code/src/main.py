@@ -21,9 +21,9 @@ def main():
         model='llama3.2',
         system=mcq_system_prompt,
         options={
-            'num_ctx': 8192,     # increasing the context window
-            'temperature': 0.1,  # less createive and more focuesed generation (default: 0.8)
-            'num_predict': 128   # limits the number of tokens the LLM can generate as response -> useful to not fill context window
+            'num_ctx': 10240,     # increasing the context window
+            'temperature': 0.1  # less createive and more focuesed generation (default: 0.8)
+            # 'num_predict': 128   # limits the number of tokens the LLM can generate as response -> useful to not fill context window
         }
         ) 
     
