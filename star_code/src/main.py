@@ -8,7 +8,7 @@ def main():
     # prompt_format = "QUESTION: {question}\n"\
     #                 "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
-    mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt.txt')
+    mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt_v2.txt')
     mcq_pformat = "Q: {question}\n"\
                   "{c1}\n{c2}\n{c3}\n{c4}\n"\
                   "STSG: {stsg}\n"\

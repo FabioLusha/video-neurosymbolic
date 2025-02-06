@@ -22,7 +22,7 @@ class OllamaRequestManager:
             response = requests.post(
                 f'{self.base_url}/api/generate',
                 json=self.params,
-                timeout=20
+                timeout=240
             )
 
             # Raise an exception for HTTP errors
@@ -32,7 +32,7 @@ class OllamaRequestManager:
             return response_data.get('response', '')
 
         except requests.RequestException as e:
-            raise Exception(f"Error making request to Ollama server: {e}")
+            raise Exception(f"Error making request to Ollama server: {e}") from e
 
     def batch_requests(self, prompts, output_dir):
 
@@ -53,7 +53,7 @@ class OllamaRequestManager:
         print("============== Starting Response Generation ==============")
 
         # Using line buffering
-        with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
+        with open(output_file, 'w', buffering=1, encoding='utf-8') as res_f:
 
             consecutive_errors = 0
             error = False
@@ -72,9 +72,8 @@ class OllamaRequestManager:
                             'response': response,
                         }
 
-                        f.write(json.dumps(response_obj,
-                                ensure_ascii=True) + '\n')
-                        f.flush()
+                        res_f.write(json.dumps(response_obj))
+                        res_f.flush()
 
                         error = False
                         consecutive_errors = 0
@@ -97,6 +96,12 @@ class OllamaRequestManager:
                             json.dumps(error_msg, indent=2, ensure_ascii=False))
                         error_f.flush()
 
+                        res_f.write(json.dumps(
+                            {'qid':id, 
+                             'response': "Error while generating the response. Look at the logs."}
+                        ))
+                        res_f.flush()
+                        
                         print(f"Error at iteration {i}\n"
                               f"Prompt id:{id}\n"
                               f"Look at the log file for specifics on the error"
