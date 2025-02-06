@@ -72,7 +72,7 @@ class OllamaRequestManager:
                             'response': response,
                         }
 
-                        res_f.write(json.dumps(response_obj))
+                        res_f.write(json.dumps(response_obj) + '\n')
                         res_f.flush()
 
                         error = False
@@ -92,14 +92,11 @@ class OllamaRequestManager:
                             'timestamp': datetime.now().isoformat()
                         }
 
-                        error_f.write(
-                            json.dumps(error_msg, indent=2, ensure_ascii=False))
+                        error_f.write(json.dumps(error_msg, indent=2, ensure_ascii=False) + '\n')
                         error_f.flush()
 
-                        res_f.write(json.dumps(
-                            {'qid':id, 
-                             'response': "Error while generating the response. Look at the logs."}
-                        ))
+                        response_file_err_msg =  {'qid':id, 'response': "Error while generating the response. Look at the logs."}
+                        res_f.write(json.dumps(response_file_err_msg) + '\n')
                         res_f.flush()
                         
                         print(f"Error at iteration {i}\n"
