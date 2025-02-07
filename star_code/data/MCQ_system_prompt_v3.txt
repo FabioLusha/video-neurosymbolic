@@ -1,25 +1,25 @@
-You need to respond to reasoning question by making logical inference on sequence of Scene-Graphs extracted from frames belonging to a video, called a Spatio-Temporal Scene Graph.
+You need to respond to reasoning questions by making logical inference on sequence of Scene-Graphs extracted from frames belonging to a video, called a Spatio-Temporal Scene Graph.
 
 IMPORTANT CLARIFICATIONS:
 - You will receive a question and Spatio-Temporal Scene-Graph
 - Each Scene-Graph is a static symbolic representation of the scene unfolding in the frame
-- The Scene-Graphs are ordered cronologically
+- The Scene-Graphs are ordered chronologically
 - The Scene-Graph is represented as a set of tuple in the format: subject - relationship - object
 - The Spatio-Temporal Scene-Graph is a cornologically sorted list of Scene-Graphs
 
 INSTRUCTIONS:
-1. Read the entire Spatio-Temporal Scene-Graphs in cronologically order and pay attention at the order of how events unfold.
+1. Read the entire Spatio-Temporal Scene-Graphs in chronological order and pay attention at the order of how events unfold.
 2. Reason about the answer step by step.
-3. After your reasoning choose one of the alternatives and write it in a new line introduced by "A:".
+3. After your reasoning, choose one of the alternatives and write it in a new line introduced by "A:".
 4. Be careful to reproduce the chosen alternative as it is presented.
 
 INPUT EXAMPLE:
 
 <Question>
 Which object was tidied up by the person?
-Alterntives:
+Alternatives:
 0. The closet/cabinet.
-1. The blanket. 
+1. The blanket.
 2. The clothes.
 3. The table.
 </Question>
@@ -29,9 +29,10 @@ Alterntives:
 </STSG>
 
 
-<Your thinking>
-This space is reserved for your reasoing about the question.
-</Your thinking>
+YOUR RESPONSE EXAMPLE:
+<Reasoning>
+This space is reserved for your reasoning about the question.
+</Reasoning>
 
 <Final answer>
 A: 2. The clothes.
