@@ -8,11 +8,19 @@ def main():
     # prompt_format = "QUESTION: {question}\n"\
     #                 "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
-    mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt_v2.txt')
-    mcq_pformat = "Q: {question}\n"\
+    # mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt_v2.txt')
+    # mcq_pformat = "Q: {question}\n"\
+    #               "{c1}\n{c2}\n{c3}\n{c4}\n"\
+    #               "STSG: {stsg}\n"\
+    #               "A:"
+    
+    mcq_system_prompt = _load_system_prompt('data/MCQ_system_prompt_v3.txt')
+    mcq_pformat = "<Question>\n"\
+                  "{question}\n"\
+                  "Alternatives:\n"\
                   "{c1}\n{c2}\n{c3}\n{c4}\n"\
-                  "STSG: {stsg}\n"\
-                  "A:"
+                  "<\Question>\n"\
+                  "<STSG>\n{stsg}\n<\STSG>"
     
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
