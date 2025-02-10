@@ -119,16 +119,29 @@ class STARPromptGenerator:
 
         
 
-    def generate(self, prompt_format, limit=None, mcq=False):
+    def generate(self, prompt_format, start=0, limit=None, mcq=False):
         """
-        @prompt_format: a string wich needs to have the two idenifier {question} and {stsg}    
+        Args:
+            prompt_format (str): a string wich needs to have the two idenifier {question} and {stsg}
+
+            start (int): from which sample to start generation
+
+            limit (int): how many prompt to generate
+
+            mcq (boolean): specifies if we need to use the MCQ prompt
+
+
+        Returns:
+            prompt
         """
         try:
             with open(self.input_filename, 'r') as in_file:
                 q_stsg_data = json.load(in_file)
 
                 for i, sample in enumerate(q_stsg_data, 1):
-                    if limit and i > limit:
+                    if i < start:
+                        continue
+                    if limit and i > (limit + start):
                         break
 
                     if mcq:
@@ -146,7 +159,7 @@ class STARPromptGenerator:
                     yield {'qid': sample['question_id'], 'prompt': prompt}
 
         except IOError as e:
-            raise IOError(f"Error reading question and stsg file: {e}")
+            raise IOError(f"Error reading question and stsg file: {e}") from e
 
     def generate_and_save_prompts(self, output_file, prompt_format, mcq=False, limit=None):
         
@@ -157,7 +170,7 @@ class STARPromptGenerator:
             # Open file with line buffering
             with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
                 for prompt_data in self.generate(prompt_format, limit, mcq):
-                    # Write each prompt as a JSON line
+                    
                     f.write(json.dumps(prompt_data, ensure_ascii=False) + '\n')
                     f.flush()
 
