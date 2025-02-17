@@ -1,27 +1,16 @@
 fastapi==0.112.2
 gensim==4.3.3
-httpcore==1.0.2
-httpx==0.27.0
-huggingface_hub==0.24.6
-ImageHash==4.3.1
-imageio==2.33.1
-json5==0.9.6
-jsonschema==4.23.0
 matplotlib==3.6.2
 
 networkx==3.1
 notebook==7.2.2
 
 numpy==1.23.5
-opencv-python==4.10.0
-opencv-python-headless==4.10.0
 
 packaging==24.1
 pandas==1.5.3
-pandas-profiling==2.9.0
-pandocfilters==1.5.0
 
-pip==24.2
+pip
 
 regex==2024.9.11
 requests==2.32.3
@@ -32,5 +21,4 @@ scipy==1.8.1
 seaborn==0.12.2
 
 
-tqdm==4.64.1
 transformers==4.45.2

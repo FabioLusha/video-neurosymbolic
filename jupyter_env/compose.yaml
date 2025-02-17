@@ -1,7 +1,16 @@
 services:
   jupyterapp:
-    build: ./
-    container_name: lusha_py_env
+    image: lusha/pydev_env
+    stdin_open: true
+    tty: true
+    container_name: lusha_pydev_env
     user: "${UID}:${GID}"
     ports: # HOST:CONTAINER
       - "10882:888"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+              count: 0
+    cpuset: "12-15"
