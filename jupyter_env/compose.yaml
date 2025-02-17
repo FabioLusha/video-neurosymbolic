@@ -1,0 +1,7 @@
+services:
+  jupyterapp:
+    build: ./
+    container_name: lusha_py_env
+    user: "${UID}:${GID}"
+    ports: # HOST:CONTAINER
+      - "10882:888"
