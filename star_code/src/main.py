@@ -26,7 +26,7 @@ def main():
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamaRequestManager(
         base_url=OLLAMA_URL, 
-        model='llama3.2',
+        model='deepseek-r1:1.5b', # 'llama3.2',
         system=mcq_system_prompt,
         options={
             'num_ctx': 10240,     # increasing the context window
@@ -41,6 +41,8 @@ def main():
         input_filename='data/datasets/STAR_QA_and_stsg_val.json',    # MCQ
     )
     
+    # start from where the server crashed (repeat the last generation to test start parm
+    # actually works)
     prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
     # generate responses
     ollama.batch_requests(
