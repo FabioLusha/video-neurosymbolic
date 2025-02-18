@@ -26,7 +26,9 @@ def main():
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamaRequestManager(
         base_url=OLLAMA_URL, 
-        model='phi3:3.8b', # 'llama3.2',
+        # model='llama3.2',
+        # model='phi3:3.8b',
+        model='deepseek-r1:1.5b',
         system=mcq_system_prompt,
         options={
             'num_ctx': 10240,     # increasing the context window
@@ -43,7 +45,7 @@ def main():
     
     # start from where the server crashed (repeat the last generation to test start parm
     # actually works)
-    prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
+    prompts = list(prompt_generator.generate(mcq_pformat, start=3760, mcq=True))
     # generate responses
     ollama.batch_requests(
         prompts=prompts,

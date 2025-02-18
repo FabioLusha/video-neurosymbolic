@@ -6,12 +6,12 @@ networks:
     external: true
 
 services:
-  lusha_req_manager:
+  lusha_deepseek:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
     build: .
-    container_name: phi3_gen
+    container_name: r1_run
     user: "${UID}:${GID}"
     
     deploy:
