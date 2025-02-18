@@ -1,12 +1,12 @@
 services:
-  jupyterapp:
+  myenv:
     image: lusha/pydev_env
     stdin_open: true
     tty: true
     container_name: lusha_pydev_env
     user: "${UID}:${GID}"
     ports: # HOST:CONTAINER
-      - "10882:888"
+      - "10882:8888"
     deploy:
       resources:
         reservations:

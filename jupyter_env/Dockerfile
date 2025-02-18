@@ -5,7 +5,6 @@ ARG USER_UID=1142
 ARG USER_GID=$USER_UID
 
 ENV DEBIAN_FRONTEND noninteractive
-
 # add repo for opython 3.X
 RUN apt update
 RUN apt install -y software-properties-common
@@ -54,6 +53,12 @@ RUN apt install -y libsm6 libxext6 libxrender-dev ffmpeg htop
 USER $USERNAME 
 RUN pip install -r /requirements.txt
 
+#RUN mkdir .jupyter
+#RUN echo c.NotebookApp.token = '' > .jupyter/jupyter_notebook_config.py \
+#	&& echo c.NotebookApp.password = '' >> .jupyter/jupyter_notebook_config.py
+
 ENV SHELL /bin/bash
 
-CMD ["bash"]
+EXPOSE 8888
+
+CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--NotebookApp.token=''", "--NotebookApp.password=''"]
