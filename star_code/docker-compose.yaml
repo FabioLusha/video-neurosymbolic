@@ -6,12 +6,12 @@ networks:
     external: true
 
 services:
-  star_request_manager:
+  lusha_req_manager:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
     build: .
-    container_name: lusha_test_star
+    container_name: phi3_gen
     user: "${UID}:${GID}"
     
     deploy:

@@ -26,7 +26,7 @@ def main():
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamaRequestManager(
         base_url=OLLAMA_URL, 
-        model='deepseek-r1:1.5b', # 'llama3.2',
+        model='phi3:3.8b', # 'llama3.2',
         system=mcq_system_prompt,
         options={
             'num_ctx': 10240,     # increasing the context window
