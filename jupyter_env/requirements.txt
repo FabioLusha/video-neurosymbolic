@@ -22,3 +22,10 @@ seaborn==0.12.2
 
 
 transformers==4.45.2
+
+wordcloud==1.9.3
+urllib3==1.26.19
+tqdm==4.64.1
+tiktoken==0.7.0
+tokenizers==0.20.1
+pillow==10.4.0
