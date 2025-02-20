@@ -29,3 +29,4 @@ tqdm==4.64.1
 tiktoken==0.7.0
 tokenizers==0.20.1
 pillow==10.4.0
+nltk==3.9.1
