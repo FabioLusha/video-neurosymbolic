@@ -1,35 +1,73 @@
-import requests
-import json
+import traceback
 import os
 from datetime import datetime
+import logging
+
+import requests
+import json
 
 
 class OllamaRequestManager:
 
-    def __init__(self, base_url, model, **opt_params):
+    def __init__(self, base_url, ollama_params, verbosity=None):
         self.base_url = base_url
-        self.model = model
+        self.model = ollama_params['model']
 
         # Setting some of the params to pass to ollama
-        self.params = opt_params
-        self.params['model'] = model
-        self.params['stream'] = False # Set to False to get full response at once
+        self.ollama_params = ollama_params
+
+        # TODO: implement logging functionality
+        self.verbosity = verbosity or int(os.getenv('DEBUG_LEVEL', 0))
+        logger = self._setup_logger()
+
+    def _setup_logger(self):
+        # TODO:
+        # map verbosity to logging levels?
+
+        class ScaffoldLogger():
+            def log(self, message):
+                print(message)
+                logger = logging.getLogger(self.__class__.__name__)
+
+            def info(self, msg):
+                self.log(msg)
+
+            def debug(self, msg):
+                self.log(msg)
+
+            def warning(self, msg):
+                self.log(msg)
+
+        return ScaffoldLogger()
 
     def make_request(self, prompt):
         try:
-            # adding the prompt param to the other params
-            self.params['prompt'] = prompt
-            response = requests.post(
+            # adding the prompt param to the other ollama_params
+            self.ollama_params['prompt'] = prompt
+
+            server_response = requests.post(
                 f'{self.base_url}/api/generate',
-                json=self.params,
-                timeout=240
+                json=self.ollama_params,
+                timeout=300,
+                stream=True
             )
 
             # Raise an exception for HTTP errors
-            response.raise_for_status()
+            server_response.raise_for_status()
 
-            response_data = response.json()
-            return response_data.get('response', '')
+            llm_generated_txt = []
+            for chunk in server_response.iter_lines():
+                # Filter out keep-alive chunks
+                if chunk: 
+                    print(chunk)
+                    data = json.loads(chunk)
+
+                    token = data.get('response', '')
+                    print(f"{token}\r")
+
+                    llm_generated_txt.append(token)
+
+            return str(llm_generated_txt)
 
         except requests.RequestException as e:
             raise Exception(f"Error making request to Ollama server: {e}") from e
@@ -83,12 +121,11 @@ class OllamaRequestManager:
                         consecutive_errors += 1
 
                     error = True
-                
                     with open(error_file, 'a', buffering=1, encoding='utf-8') as error_f:
                         error_msg = {
                             'qid': id,
                             'prompt': prompt,
-                            'error': str(e),
+                            'error': traceback.format_exc(),
                             'timestamp': datetime.now().isoformat()
                         }
 

@@ -25,17 +25,20 @@ def main():
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     ollama = OllamaRequestManager(
-        base_url=OLLAMA_URL, 
-        # model='llama3.2',
-        # model='phi3:3.8b',
-        model='deepseek-r1:1.5b',
-        system=mcq_system_prompt,
-        options={
-            'num_ctx': 10240,     # increasing the context window
-            'temperature': 0.1,   # less createive and more focuesed generation (default: 0.8)
-            'num_predict': 4096   # let's check if fixing a number of max output token fixes the bug
+        base_url=OLLAMA_URL,
+        ollama_params={ 
+            # model='llama3.2',
+            # model='phi3:3.8b',
+            'model': 'deepseek-r1:1.5b',
+            'system': mcq_system_prompt,
+            'stream': True,
+            'options': {
+                'num_ctx': 10240,     # increasing the context window
+                'temperature': 0.1,   # less createive and more focuesed generation (default: 0.8)
+                'num_predict': 4096   # let's check if fixing a number of max output token fixes the bug
+            }
         }
-        ) 
+    ) 
     
     # Initialize the prompt generator
     prompt_generator = STARPromptGenerator(

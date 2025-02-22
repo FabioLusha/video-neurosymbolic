@@ -1,22 +1,32 @@
-from fastapi import FastAPI, HTTPException, Request
-import uvicorn
 import logging
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
+import asyncio
+import uvicorn
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI scaffold_server
 scaffold_server = FastAPI()
 
-
 @scaffold_server.post("/api/generate")
 async def generate(request: Request):
-    """Handle generation requests"""
+    """Handle generation requests with streaming by default"""
     try:
+        # Parse the request body as JSON
         body = await request.json()
-        logger.info(f"Received request with prompt:\n {body.get('prompt')}")
-        return {"response": "Hi, I am alive"}
+        prompt = body.get('prompt')
+        logger.info(f"Received request with prompt:\n {prompt}")
+
+        # Streaming response by default
+        async def generate_words():
+            words = "Hi, I am alive".split()
+            for word in words:
+                yield f"{word} "
+                await asyncio.sleep(0.5)  # Simulate delay between words
+
+        return StreamingResponse(generate_words(), media_type="text/plain")
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
