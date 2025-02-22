@@ -33,11 +33,11 @@ def main():
             'system': mcq_system_prompt,
             'stream': True,
             'options': {
-                'num_ctx': 10240,     # increasing the context window
+                'num_ctx': 20480,     # increasing the context window
                 'temperature': 0.1,   # less createive and more focuesed generation (default: 0.8)
-                'num_predict': 4096   # let's check if fixing a number of max output token fixes the bug
+                'num_predict': 10240   # let's check if fixing a number of max output token fixes the bug
             }
-        }
+       }
     ) 
     
     # Initialize the prompt generator
@@ -48,7 +48,7 @@ def main():
     
     # start from where the server crashed (repeat the last generation to test start parm
     # actually works)
-    prompts = list(prompt_generator.generate(mcq_pformat, start=3760, mcq=True))
+    prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
     # generate responses
     ollama.batch_requests(
         prompts=prompts,
