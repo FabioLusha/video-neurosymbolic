@@ -1,4 +1,5 @@
 import logging
+import json
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import asyncio
@@ -23,10 +24,10 @@ async def generate(request: Request):
         async def generate_words():
             words = "Hi, I am alive".split()
             for word in words:
-                yield f"{word} "
+                yield json.dumps({'response': f'{word} '}) + '\n'
                 await asyncio.sleep(0.5)  # Simulate delay between words
 
-        return StreamingResponse(generate_words(), media_type="text/plain")
+        return StreamingResponse(generate_words(), media_type="application/x-ndjson")
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
@@ -42,6 +43,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "scaffold_server:scaffold_server",
         host="localhost",
-        port=11434,
+        port=8000,
         reload=True
     )

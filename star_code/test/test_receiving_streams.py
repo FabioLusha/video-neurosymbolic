@@ -40,7 +40,7 @@ def main():
           
     # Initialize the Ollama manager
     manager = OllamaRequestManager(
-        base_url='http://localhost:11434',
+        base_url='http://localhost:8000',
         ollama_params={
             'model': 'llama2'
         }
