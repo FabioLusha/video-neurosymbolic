@@ -65,10 +65,12 @@ class OllamaRequestManager:
                     llm_generated_txt.append(token)
                     print(''.join(llm_generated_txt), '\r')
 
-            return ''.join(llm_generated_txt)
-
         except requests.RequestException as e:
-            raise Exception(f"Error making request to Ollama server: {e}") from e
+            response_sofar = ''.join(llm_generated_txt)
+            e.response = response_sofar
+            raise
+
+    return '.'.join(llm_generated_txt)
 
     def batch_requests(self, prompts, output_dir):
 
@@ -114,15 +116,18 @@ class OllamaRequestManager:
                         error = False
                         consecutive_errors = 0
 
-                except Exception as e:
+                except requests.RequestException as e:
                     if error:
                         consecutive_errors += 1
 
                     error = True
                     with open(error_file, 'a', buffering=1, encoding='utf-8') as error_f:
+                        response = getattr(e, 'response')
+
                         error_msg = {
                             'qid': id,
                             'prompt': prompt,
+                            'response': response,
                             'error': traceback.format_exc(),
                             'timestamp': datetime.now().isoformat()
                         }
@@ -130,14 +135,18 @@ class OllamaRequestManager:
                         error_f.write(json.dumps(error_msg, indent=2, ensure_ascii=False) + '\n')
                         error_f.flush()
 
-                        response_file_err_msg =  {'qid':id, 'response': "Error while generating the response. Look at the logs."}
+                        response_file_msg = {
+                            'qid':id,
+                            'response': "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n" + response
+                        }
+
                         res_f.write(json.dumps(response_file_err_msg) + '\n')
                         res_f.flush()
-                        
+
                         print(f"Error at iteration {i}\n"
                               f"Prompt id:{id}\n"
                               f"Look at the log file for specifics on the error"
-                              )
+                             )
 
                 finally:
                     if consecutive_errors > 5:
@@ -146,13 +155,12 @@ class OllamaRequestManager:
 
 
 class STARPromptGenerator:
+
     def __init__(self, input_filename):
         if not os.path.exists(input_filename):
             raise OSError(f"No such file or directory: '{input_filename}'")
-        
-        self.input_filename = input_filename
 
-        
+        self.input_filename = input_filename
 
     def generate(self, prompt_format, start=0, limit=None, mcq=False):
         """
@@ -183,13 +191,18 @@ class STARPromptGenerator:
                         choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
                         c1, c2, c3, c4 = choices
                         prompt = prompt_format.format(
-                                        question=sample['question'],
-                                        c1=c1, c2=c2, c3=c3, c4=c4,
-                                        stsg=str(sample['stsg']))
+                            question=sample['question'],
+                            c1      =c1,
+                            c2      =c2,
+                            c3      =c3,
+                            c4      =c4,
+                            stsg    =str(sample['stsg'])
+                        )
                     else:
                         prompt = prompt_format.format(
-                                        question=sample['question'],
-                                        stsg=str(sample['stsg']))
+                            question=sample['question'],
+                            stsg    =str(sample['stsg'])
+                        )
 
                     yield {'qid': sample['question_id'], 'prompt': prompt}
 
