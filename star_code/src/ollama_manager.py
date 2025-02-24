@@ -58,12 +58,15 @@ class OllamaRequestManager:
             llm_generated_txt = []
             for chunk in server_response.iter_lines():
                 # Filter out keep-alive chunks
-                if chunk: 
+                if chunk:
                     data = json.loads(chunk)
 
                     token = data.get('response', '')
                     llm_generated_txt.append(token)
                     print(''.join(llm_generated_txt), '\r')
+
+                    if data.get('done', '') == True:
+                        break
 
         except requests.RequestException as e:
             response_sofar = ''.join(llm_generated_txt)
