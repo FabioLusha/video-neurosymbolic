@@ -172,7 +172,7 @@ class STARPromptGenerator:
 
         self.input_filename = input_filename
 
-    def generate(self, prompt_format, start=0, limit=None, mcq=False):
+    def generate(self, prompt_format, ids=None, start=0, limit=None, prompt_type=None):
         """
         Args:
             prompt_format (str): a string wich needs to have the two idenifier {question} and {stsg}
@@ -197,7 +197,7 @@ class STARPromptGenerator:
                     if limit and i > (limit + start):
                         break
 
-                    if mcq:
+                    if pormpt_type == 'mcq':
                         choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
                         c1, c2, c3, c4 = choices
                         prompt = prompt_format.format(
@@ -208,6 +208,13 @@ class STARPromptGenerator:
                             c4      =c4,
                             stsg    =str(sample['stsg'])
                         )
+                    elif propmt_type == 'judge':
+                        gt_ans = sample['choices'][str(sample['answer'])]
+                        prompt = prompt_format(
+                            question=sample['question'],
+                            gt_answer=gt_ans,
+                            # TODO: Complete the predictions
+
                     else:
                         prompt = prompt_format.format(
                             question=sample['question'],
