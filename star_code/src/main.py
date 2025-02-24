@@ -54,8 +54,7 @@ def main():
     prompts = list(prompt_generator.generate(mcq_pformat, mcq=True))
     # generate responses
     ollama.batch_requests(
-        prompts=prompts,
-        output_dir='outputs'
+        prompts=prompts
     )
 
 def _load_system_prompt(filename):

@@ -72,16 +72,23 @@ class OllamaRequestManager:
 
     return '.'.join(llm_generated_txt)
 
-    def batch_requests(self, prompts, output_dir):
+    def batch_requests(self, prompts, output_file=None):
 
-        # Create directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
 
-        # Saving the response as JSON in jsonl format,
-        # where each json object is saved in one line
-        start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
-        output_file = os.path.join(
-            output_dir, f'responses_{self.model}_{start_timestamp}.jsonl')
+        if output_file:
+            # Create directory if it doesn't exist
+            os.makedirs(output_file, exist_ok=True)
+        else:
+            output_dir = 'outputs'
+
+            # Create directory if it doesn't exist
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Saving the response as JSON in jsonl format,
+            # where each json object is saved in one line
+            start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+            output_file = os.path.join(
+                output_dir, f'responses_{self.model}_{start_timestamp}.jsonl')
 
         error_file = os.path.join(
             output_dir, f'errors_{self.model}_{start_timestamp}.txt')
@@ -210,7 +217,7 @@ class STARPromptGenerator:
             raise IOError(f"Error reading question and stsg file: {e}") from e
 
     def generate_and_save_prompts(self, output_file, prompt_format, mcq=False, limit=None):
-        
+
         # Create output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
@@ -218,7 +225,6 @@ class STARPromptGenerator:
             # Open file with line buffering
             with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
                 for prompt_data in self.generate(prompt_format, limit, mcq):
-                    
                     f.write(json.dumps(prompt_data, ensure_ascii=False) + '\n')
                     f.flush()
 
