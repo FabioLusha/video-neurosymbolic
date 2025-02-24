@@ -1,6 +1,8 @@
 from ollama_manager import STARPromptGenerator, OllamaRequestManager
 import os
 
+SEED = 6
+
 def main():
     
 
@@ -33,9 +35,10 @@ def main():
             'system': mcq_system_prompt,
             'stream': True,
             'options': {
-                'num_ctx': 20480,     # increasing the context window
-                'temperature': 0.1,   # less createive and more focuesed generation (default: 0.8)
-                'num_predict': 10240   # let's check if fixing a number of max output token fixes the bug
+                'num_ctx': 20480,       # increasing the context window
+                'temperature': 0.1,     # less createive and more focuesed generation (default: 0.8)
+                'num_predict': 10240,   # let's check if fixing a number of max output token fixes the bug
+                'seed': SEED            # For reproducible results
             }
        }
     ) 
