@@ -6,6 +6,8 @@ import logging
 import requests
 import json
 
+import prompt_formatters as pf
+
 
 class OllamaRequestManager:
 
@@ -65,7 +67,7 @@ class OllamaRequestManager:
                     llm_generated_txt.append(token)
                     print(''.join(llm_generated_txt), '\r')
 
-                    if data.get('done', '') == True:
+                    if data.get('done', ''):
                         break
 
         except requests.RequestException as e:
@@ -73,10 +75,9 @@ class OllamaRequestManager:
             e.response = response_sofar
             raise
 
-    return '.'.join(llm_generated_txt)
+        return '.'.join(llm_generated_txt)
 
     def batch_requests(self, prompts, output_file=None):
-
 
         if output_file:
             # Create directory if it doesn't exist
@@ -142,21 +143,27 @@ class OllamaRequestManager:
                             'timestamp': datetime.now().isoformat()
                         }
 
-                        error_f.write(json.dumps(error_msg, indent=2, ensure_ascii=False) + '\n')
+                        error_f.write(
+                            json.dumps(
+                                error_msg,
+                                indent=2,
+                                ensure_ascii=False
+                            ) + '\n'
+                        )
                         error_f.flush()
 
                         response_file_msg = {
-                            'qid':id,
+                            'qid': id,
                             'response': "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n" + response
                         }
 
-                        res_f.write(json.dumps(response_file_err_msg) + '\n')
+                        res_f.write(json.dumps(response_file_msg) + '\n')
                         res_f.flush()
 
                         print(f"Error at iteration {i}\n"
                               f"Prompt id:{id}\n"
                               f"Look at the log file for specifics on the error"
-                             )
+                              )
 
                 finally:
                     if consecutive_errors > 5:
@@ -172,10 +179,17 @@ class STARPromptGenerator:
 
         self.input_filename = input_filename
 
-    def generate(self, prompt_format, ids=None, start=0, limit=None, prompt_type=None):
+    def generate(
+            self,
+            prompt_formatter,
+            ids=None,
+            start=0,
+            limit=None):
         """
         Args:
-            prompt_format (str): a string wich needs to have the two idenifier {question} and {stsg}
+            prompt_formatter (PromptFormatter):
+                An object that given a data point form the STAR dataset
+                formats the prompt according to what is sepcified in the object
 
             start (int): from which sample to start generation
 
@@ -191,42 +205,25 @@ class STARPromptGenerator:
             with open(self.input_filename, 'r') as in_file:
                 q_stsg_data = json.load(in_file)
 
+                if ids:
+                    q_stsg_data = [sample for sample in q_stsg_data
+                                   if sample['question_id'] in ids]
+
                 for i, sample in enumerate(q_stsg_data, 1):
                     if i < start:
                         continue
                     if limit and i > (limit + start):
                         break
 
-                    if pormpt_type == 'mcq':
-                        choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
-                        c1, c2, c3, c4 = choices
-                        prompt = prompt_format.format(
-                            question=sample['question'],
-                            c1      =c1,
-                            c2      =c2,
-                            c3      =c3,
-                            c4      =c4,
-                            stsg    =str(sample['stsg'])
-                        )
-                    elif propmt_type == 'judge':
-                        gt_ans = sample['choices'][str(sample['answer'])]
-                        prompt = prompt_format(
-                            question=sample['question'],
-                            gt_answer=gt_ans,
-                            # TODO: Complete the predictions
-
-                    else:
-                        prompt = prompt_format.format(
-                            question=sample['question'],
-                            stsg    =str(sample['stsg'])
-                        )
+                    prompt = prompt_formatter.format(sample)
 
                     yield {'qid': sample['question_id'], 'prompt': prompt}
 
         except IOError as e:
             raise IOError(f"Error reading question and stsg file: {e}") from e
 
-    def generate_and_save_prompts(self, output_file, prompt_format, mcq=False, limit=None):
+    def generate_and_save_prompts(
+            self, output_file, prompt_formatter, start=0, limit=None):
 
         # Create output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -234,7 +231,7 @@ class STARPromptGenerator:
         try:
             # Open file with line buffering
             with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
-                for prompt_data in self.generate(prompt_format, limit, mcq):
+                for prompt_data in self.generate(prompt_formatter, limit, mcq):
                     f.write(json.dumps(prompt_data, ensure_ascii=False) + '\n')
                     f.flush()
 
@@ -243,4 +240,4 @@ class STARPromptGenerator:
                 return True
 
         except IOError as e:
-            raise IOError(f"Error saving prompts") from e
+            raise IOError("Error saving prompts") from e
