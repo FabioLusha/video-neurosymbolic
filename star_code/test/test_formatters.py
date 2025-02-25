@@ -15,7 +15,7 @@ random.seed(SEED)
 
 
 class PromptFormatterTest(unittest.TestCase):
-    def __init__(self):
+    def setUp(self):
         input_filename = '../data/datasets/STAR_QA_and_stsg_val.json'
 
         with open(input_filename, 'r') as in_file:
@@ -37,7 +37,7 @@ class PromptFormatterTest(unittest.TestCase):
 
         test_prompt = pf.OpenEndedPrompt(prompt_format).format(self.sample)
 
-        assert test_prompt == gt_prompt
+        self.assertEqual(gt_prompt, test_prompt)
 
 
 if __name__ == "__main__":

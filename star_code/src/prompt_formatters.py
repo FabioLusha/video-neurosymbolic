@@ -10,13 +10,15 @@ class PromptFormatter:
         pass
 
 
-class OpeEndedPrompt(PromptFormatter):
+class OpenEndedPrompt(PromptFormatter):
 
     def format(self, sample):
         args = dict()
 
         args['question'] = sample['question']
         args['stsg'] = sample['stsg']
+
+        return self.prompt_format.format(**args)
 
 
 class MCQPrompt(PromptFormatter):
@@ -34,8 +36,7 @@ class MCQPrompt(PromptFormatter):
 
         args['stsg'] = str(sample['stsg'])
 
-        self.prompt_format.format(**args)
-        return self.prompt_format
+        return self.prompt_format.format(**args)
 
 
 class LlmAsJudgePrompt(PromptFormatter):
@@ -56,5 +57,4 @@ class LlmAsJudgePrompt(PromptFormatter):
 
         args['prediction'] = self.predictions[qid]['pred']
 
-        self.prompt.format(**args)
-        return self.prompt
+        return self.prompt_format.format(**args)
