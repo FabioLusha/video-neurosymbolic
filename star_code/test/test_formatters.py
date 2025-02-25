@@ -39,6 +39,30 @@ class PromptFormatterTest(unittest.TestCase):
 
         self.assertEqual(gt_prompt, test_prompt)
 
+    def test_mcq_prompt(self):
+        prompt_format = "Q: {question}\n"\
+                      "{c1}\n{c2}\n{c3}\n{c4}\n"\
+                      "STSG: {stsg}\n"\
+                      "A:"
+
+        question = self.sample['question']
+        stsg = self.sample['stsg']
+        choices = [f"{key}. {val}" for key, val in self.sample['choices'].items()]
+        c1, c2, c3, c4 = choices
+
+        gt_prompt = prompt_format.format(
+            question=question,
+            stsg=stsg,
+            c1=c1,
+            c2=c2,
+            c3=c3,
+            c4=c4
+        )
+
+        test_prompt = pf.MCQPrompt(prompt_format).format(self.sample)
+
+        self.assertEqual(gt_prompt, test_prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
