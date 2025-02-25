@@ -29,8 +29,8 @@ def main():
     #               "<\Question>\n"\
     #               "<STSG>\n{stsg}\n<\STSG>"
 
-    llm_judge_sys_prompt = _load_prompt_fromfile('LLM_judge_system.txt')
-    llm_judge_usr_prompt = _load_prompt_fromfile('LLM_judge_user.txt')
+    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
+    llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
 
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
@@ -52,9 +52,9 @@ def main():
         }
     )
 
-    mispredictions_filepath = '../data/llama3b_wrongs.jsonl'
+    mispredictions_filepath = 'data/llama3b_wrongs.jsonl'
 
-    judge_pformatter = pf.promptformatter(
+    judge_pformatter = pf.LlmAsJudgePrompt(
         llm_judge_usr_prompt, mispredictions_filepath)
 
     with open(mispredictions_filepath, 'r') as f:

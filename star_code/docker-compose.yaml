@@ -6,10 +6,14 @@ networks:
     external: true
 
 services:
-  lusha_deepseek_run:
+  lusha_llama3b_wrongs:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
+      - PYTHONFAULTHANDLER=1
+      - PYTHONIOENCODING=UTF-8
+    stdin_open: true  # Keep stdin open
+    tty: true        # Allocate a pseudo-TTY
     build: .
     container_name: req_gen
     user: "${UID}:${GID}"

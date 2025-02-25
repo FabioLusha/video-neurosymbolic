@@ -18,4 +18,4 @@ Please generate the response in the form of a Python dictionary string with keys
 'reason', where value of 'pred' is a string of 'correct' or 'incorrect', value of 'score' is in INTEGER, not STRING
 and value of 'reason' should provide the reason behind the decision.
 Only provide the Python dictionary string.
-For example, your response should look like this: {'pred': 'correct', 'score': 4, 'reason': reason}.
+For example, your response should look like this: {{'pred': 'correct', 'score': 4, 'reason': reason}}.

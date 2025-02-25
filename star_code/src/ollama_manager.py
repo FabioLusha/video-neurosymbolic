@@ -65,11 +65,11 @@ class OllamaRequestManager:
 
                     token = data.get('response', '')
                     llm_generated_txt.append(token)
-                    print(''.join(llm_generated_txt), '\r')
+                    print(token, end='', flush=True)
 
                     if data.get('done', ''):
                         break
-
+            print()
         except requests.RequestException as e:
             response_sofar = ''.join(llm_generated_txt)
             e.response = response_sofar
