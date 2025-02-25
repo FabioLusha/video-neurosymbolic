@@ -42,10 +42,18 @@ class MCQPrompt(PromptFormatter):
 class LlmAsJudgePrompt(PromptFormatter):
 
     def __init__(self, prompt_format, predictions_path):
-        super(prompt_format)
+        self.prompt_format = prompt_format
+
+        if not predictions_path.endswith('.jsonl'):
+            raise ValueError(
+                "File type not supported. Expected a .jsonl file.")
 
         with open(predictions_path, 'r') as in_f:
-            self.predictions = {i['question_id']: i for i in json.load(in_f)}
+            # expect a JSONL file
+
+            self.predictions = \
+                {json.loads(line)['question_id']: json.loads(line)
+                 for line in in_f.readlines()}
 
     def format(self, sample):
         args = dict()
@@ -55,6 +63,6 @@ class LlmAsJudgePrompt(PromptFormatter):
         args['question'] = sample['question']
         args['gt_answer'] = sample['choices'][str(sample['answer'])]
 
-        args['prediction'] = self.predictions[qid]['pred']
+        args['prediction'] = self.predictions[qid]['prediction']
 
         return self.prompt_format.format(**args)
