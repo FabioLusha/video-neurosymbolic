@@ -70,14 +70,13 @@ class OllamaRequestManager:
                         elapsed = data.get('eval_duration', '')
                         ntokens = data.get('eval_count', '')
 
-                        print(f"Response at: {elapsed/ntokens * 10**9:.1f} tk/s")
+                        print(f"\n\nResponse at: {ntokens/elapsed * 10**9:.1f} tk/s")
                         break
 
                     token = data.get('response', '')
                     llm_generated_txt.append(token)
                     print(token, end='', flush=True)
                     
-            print()
         except requests.RequestException as e:
             response_sofar = ''.join(llm_generated_txt)
             e.response = response_sofar
@@ -119,7 +118,7 @@ class OllamaRequestManager:
                 prompt = sample['prompt']
 
                 try:
-                    print(f"Generating response for prompt {i}")
+                    print(f"\nGenerating response for prompt {i}")
 
                     response = self.make_request(prompt)
                     if response:

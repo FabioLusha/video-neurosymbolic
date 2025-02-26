@@ -6,12 +6,10 @@ networks:
     external: true
 
 services:
-  lusha_llama3b_wrongs:
+  lusha_llama3b:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
-      - PYTHONFAULTHANDLER=1
-      - PYTHONIOENCODING=UTF-8
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
     build: .
