@@ -2,7 +2,7 @@ version: '3'
 
 networks:
   default:
-    name: ollama-network
+    name: lusha_network
     external: true
 
 services:
@@ -15,8 +15,8 @@ services:
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
     build: .
-    container_name: req_gen
-    user: "${UID}:${GID}"
+    container_name: lusha_req_gen
+    user: "${UID-1142}:${GID-1142}"
     
     deploy:
       resources:

@@ -63,12 +63,20 @@ class OllamaRequestManager:
                 if chunk:
                     data = json.loads(chunk)
 
+                    if data.get('done', ''):
+                        # the last message in the stream does not contain
+                        # any tokens in response, it contains metadata about
+                        # the generated response
+                        elapsed = data.get('eval_duration', '')
+                        ntokens = data.get('eval_count', '')
+
+                        print(f"Response at: {elapsed/ntokens * 10**9:.1f} tk/s")
+                        break
+
                     token = data.get('response', '')
                     llm_generated_txt.append(token)
                     print(token, end='', flush=True)
-
-                    if data.get('done', ''):
-                        break
+                    
             print()
         except requests.RequestException as e:
             response_sofar = ''.join(llm_generated_txt)
