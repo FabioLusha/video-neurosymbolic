@@ -42,7 +42,11 @@ class OllamaRequestManager:
 
         return ScaffoldLogger()
 
-    def make_request(self, prompt):
+    def make_request(self, prompt, req_timeout=120):
+
+        if self.ollama_params['model'].startswith('llama8'):
+            req_timeout = 300
+        
         try:
             # adding the prompt param to the other ollama_params
             self.ollama_params['prompt'] = prompt
@@ -50,7 +54,7 @@ class OllamaRequestManager:
             server_response = requests.post(
                 f'{self.base_url}/api/generate',
                 json=self.ollama_params,
-                timeout=300,
+                timeout=req_timeout,
                 stream=True
             )
 

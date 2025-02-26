@@ -52,7 +52,7 @@ def main():
                 'num_ctx': 10240,       # increasing the context window
                 # less createive and more focuesed generation (default: 0.8)
                 'temperature': 0.1,
-                'num_predict': 4096,   # let's check if fixing a number of max output token fixes the bug
+                'num_predict': 8192,   # let's check if fixing a number of max output token fixes the bug
                 'seed': SEED            # For reproducible results
             }
         }
