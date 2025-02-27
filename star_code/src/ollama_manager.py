@@ -47,6 +47,7 @@ class OllamaRequestManager:
         if self.ollama_params['model'].startswith('llama8'):
             req_timeout = 300
         
+        token_stream = []
         try:
             # adding the prompt param to the other ollama_params
             self.ollama_params['prompt'] = prompt
@@ -61,7 +62,7 @@ class OllamaRequestManager:
             # Raise an exception for HTTP errors
             server_response.raise_for_status()
 
-            llm_generated_txt = []
+            
             for chunk in server_response.iter_lines():
                 # Filter out keep-alive chunks
                 if chunk:
@@ -78,15 +79,15 @@ class OllamaRequestManager:
                         break
 
                     token = data.get('response', '')
-                    llm_generated_txt.append(token)
+                    token_stream.append(token)
                     print(token, end='', flush=True)
                     
         except requests.RequestException as e:
-            response_sofar = ''.join(llm_generated_txt)
+            response_sofar = ''.join(token_stream)
             e.response = response_sofar
             raise
 
-        return '.'.join(llm_generated_txt)
+        return ''.join(token_stream)
 
     def batch_requests(self, prompts, output_file=None):
 
