@@ -13,14 +13,22 @@ def main():
     # prompt_format = "QUESTION: {question}\n"\
     #                 "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
+
+
     mcq_system_prompt = \
        _load_prompt_fromfile('data/prompts/MCQ_system_prompt_v2_oneshot.txt')
-    mcq_pformat = "Q: {question}\n"\
-                  "{c1}\n{c2}\n{c3}\n{c4}\n"\
-                  "STSG: {stsg}\n"\
-                  "A:"
+    # mcq_pformat = "Q: {question}\n"\
+    #               "{c1}\n{c2}\n{c3}\n{c4}\n"\
+    #               "STSG: {stsg}\n"\
+    #               "A:"
+    # 
+    # mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
+
+    mcq_bias_pformat = "Q: {question}\n"\
+                       "{c1}\n{c2}\n{c3}\n{c4}\n"\
+                       "A:"
     
-    mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
+    mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
     # mcq_system_prompt = \
     #     _load_prompt_fromfile('data/MCQ_system_prompt_v3.txt')
@@ -33,6 +41,14 @@ def main():
 
     # llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
     # llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
+    #
+    # mispredictions_filepath = 'data/llama3b_wrongs.jsonl'
+    # judge_pformatter = pf.LlmAsJudgePrompt(
+    #     llm_judge_usr_prompt, mispredictions_filepath)
+    # 
+    # with open(mispredictions_filepath, 'r') as f:
+    #     ids = [json.loads(line)['question_id'] for line in f.readlines()]
+
 
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
@@ -58,14 +74,6 @@ def main():
         }
     )
 
-    mispredictions_filepath = 'data/llama3b_wrongs.jsonl'
-
-    # judge_pformatter = pf.LlmAsJudgePrompt(
-    #     llm_judge_usr_prompt, mispredictions_filepath)
-    # 
-    # with open(mispredictions_filepath, 'r') as f:
-    #     ids = [json.loads(line)['question_id'] for line in f.readlines()]
-
     # Initialize the prompt generator
     prompt_generator = STARPromptGenerator(
         # input_filename='data/datasets/STAR_question_and_stsg.json',    # Generative
@@ -75,7 +83,7 @@ def main():
     # start from where the server crashed (repeat the last generation to
     # test start parm actually works)
     prompts = list(prompt_generator.generate(
-        prompt_formatter=mcq_pfromatter
+        prompt_formatter=mcq_bias_pfromatter
     ))
     # generate responses
     ollama.batch_requests(

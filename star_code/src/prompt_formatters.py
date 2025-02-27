@@ -39,6 +39,22 @@ class MCQPrompt(PromptFormatter):
         return self.prompt_format.format(**args)
 
 
+class MCQPromptWoutSTSG(PromptFormatter):
+
+    def format(self, sample):
+        args = dict()
+
+        args['question'] = sample['question']
+
+        choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
+        args['c1'] = choices[0]
+        args['c2'] = choices[1]
+        args['c3'] = choices[2]
+        args['c4'] = choices[3]
+
+        return self.prompt_format.format(**args)
+
+
 class LlmAsJudgePrompt(PromptFormatter):
 
     def __init__(self, prompt_format, predictions_path):
