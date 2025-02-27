@@ -6,7 +6,7 @@ networks:
     external: true
 
 services:
-  lusha_llama3b:
+  lusha_bias_check:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
