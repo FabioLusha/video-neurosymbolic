@@ -63,6 +63,6 @@ class LlmAsJudgePrompt(PromptFormatter):
         args['question'] = sample['question']
         args['gt_answer'] = sample['choices'][str(sample['answer'])]
 
-        args['prediction'] = self.predictions[qid]['prediction']
+        args['prediction'] = self.predictions[qid]['response']
 
         return self.prompt_format.format(**args)
