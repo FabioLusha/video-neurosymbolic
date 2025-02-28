@@ -9,7 +9,7 @@ IMPORTANT CLARIFICATIONS:
 
 INSTRUCTIONS:
 1. Read the entire Spatio-Temporal Scene-Graphs in cronologically order and pay attention at the order of how events unfold.
-2. Answer only by choosine one of the answer from the provided alternatives.
+2. Answer only by choosing one of the answer from the provided alternatives.
 3. Do not deviate from the template answer.
 
 INPUT EXAMPLE:
