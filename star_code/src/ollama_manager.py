@@ -42,10 +42,10 @@ class OllamaRequestManager:
 
         return ScaffoldLogger()
 
-    def make_request(self, prompt, req_timeout=120):
+    def make_request(self, prompt, req_timeout=60):
 
         if self.ollama_params['model'].startswith('llama8'):
-            req_timeout = 300
+            req_timeout = 180
         
         token_stream = []
         try:

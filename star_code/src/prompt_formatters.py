@@ -68,7 +68,7 @@ class LlmAsJudgePrompt(PromptFormatter):
             # expect a JSONL file
 
             self.predictions = \
-                {json.loads(line)['question_id']: json.loads(line)
+                {json.loads(line)['qid']: json.loads(line)
                  for line in in_f.readlines()}
 
     def format(self, sample):

@@ -16,14 +16,14 @@ def main():
 
 
     ##### PROMPT FOR MULTI-CHOICE QA
-    mcq_system_prompt = \
-      _load_prompt_fromfile('data/prompts/MCQ_system_prompt_v2_oneshot.txt')
-    mcq_pformat = "Q: {question}\n"\
-                  "{c1}\n{c2}\n{c3}\n{c4}\n"\
-                  "STSG: {stsg}\n"\
-                  "A:"
-    
-    mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
+    # mcq_system_prompt = \
+    #   _load_prompt_fromfile('data/prompts/MCQ_system_prompt_v2_oneshot.txt')
+    # mcq_pformat = "Q: {question}\n"\
+    #               "{c1}\n{c2}\n{c3}\n{c4}\n"\
+    #               "STSG: {stsg}\n"\
+    #               "A:"
+    # 
+    # mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
 
     ##### PROMPT FOR MULTI-CHOICE QA WITH HTML TAGS
     # mcq_system_prompt = \
@@ -44,13 +44,13 @@ def main():
     # 
     # mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
-    # llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
-    # llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
-    #
-    # mispredictions_filepath = 'data/llama3b_wrongs.jsonl'
-    # judge_pformatter = pf.LlmAsJudgePrompt(
-    #     llm_judge_usr_prompt, mispredictions_filepath)
-    # 
+    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
+    llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
+
+    mispredictions_filepath = 'outputs/responses_deepseek-r1:7b_20250219_13:52:42.jsonl'
+    judge_pformatter = pf.LlmAsJudgePrompt(
+        llm_judge_usr_prompt, mispredictions_filepath)
+    
     # with open(mispredictions_filepath, 'r') as f:
     #     ids = [json.loads(line)['question_id'] for line in f.readlines()]
 
@@ -60,13 +60,13 @@ def main():
     ollama = OllamaRequestManager(
         base_url=OLLAMA_URL,
         ollama_params={
-            'model': 'llama3.2',
-            # 'model': 'llama3.1:8b',
+            # 'model': 'llama3.2',
+            'model': 'llama3.1:8b',
             # 'model': 'phi3:3.8b',
             # 'model': 'deepseek-r1:1.5b',
 
             # 'system': llm_judge_sys_prompt,
-            'system': mcq_system_prompt,
+            'system': llm_judge_sys_prompt,
 
             'stream': True,
             'options': {
@@ -88,8 +88,7 @@ def main():
     # test start parm actually works)
     prompts = list(
         prompt_generator.generate(
-            prompt_formatter=mcq_pfromatter,
-            start=3611
+            prompt_formatter=judge_pformatter
     ))
     # generate responses
     ollama.batch_requests(
