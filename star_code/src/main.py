@@ -15,21 +15,17 @@ def main():
 
 
 
+    ##### PROMPT FOR MULTI-CHOICE QA
     mcq_system_prompt = \
-       _load_prompt_fromfile('data/prompts/MCQ_system_prompt_v2_oneshot.txt')
-    # mcq_pformat = "Q: {question}\n"\
-    #               "{c1}\n{c2}\n{c3}\n{c4}\n"\
-    #               "STSG: {stsg}\n"\
-    #               "A:"
-    # 
-    # mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
-
-    mcq_bias_pformat = "Q: {question}\n"\
-                       "{c1}\n{c2}\n{c3}\n{c4}\n"\
-                       "A:"
+      _load_prompt_fromfile('data/prompts/MCQ_system_prompt_v2_oneshot.txt')
+    mcq_pformat = "Q: {question}\n"\
+                  "{c1}\n{c2}\n{c3}\n{c4}\n"\
+                  "STSG: {stsg}\n"\
+                  "A:"
     
-    mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
+    mcq_pfromatter = pf.MCQPrompt(mcq_pformat)
 
+    ##### PROMPT FOR MULTI-CHOICE QA WITH HTML TAGS
     # mcq_system_prompt = \
     #     _load_prompt_fromfile('data/MCQ_system_prompt_v3.txt')
     # mcq_pformat = "<Question>\n"\
@@ -38,6 +34,15 @@ def main():
     #               "{c1}\n{c2}\n{c3}\n{c4}\n"\
     #               "<\Question>\n"\
     #               "<STSG>\n{stsg}\n<\STSG>"
+
+    ##### PROMPTS FOR BIAS CHECK - I.E. QUESTION WITHOUT STSG
+    # mcq_system_prompt_bias = \
+    #   _load_prompt_fromfile('data/prompts/system_prompt_bias_check.txt')
+    # mcq_bias_pformat = "Q: {question}\n"\
+    #                    "{c1}\n{c2}\n{c3}\n{c4}\n"\
+    #                    "A:"
+    # 
+    # mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
     # llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
     # llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
@@ -66,9 +71,8 @@ def main():
             'stream': True,
             'options': {
                 'num_ctx': 10240,       # increasing the context window
-                # less createive and more focuesed generation (default: 0.8)
-                'temperature': 0.1,
-                'num_predict': 8192,   # let's check if fixing a number of max output token fixes the bug
+                'temperature': 0.1,     # less createive and more focuesed generation (default: 0.8)
+                'num_predict': 8192,    # fixing the number of max output tokens
                 'seed': SEED            # For reproducible results
             }
         }
@@ -82,8 +86,10 @@ def main():
 
     # start from where the server crashed (repeat the last generation to
     # test start parm actually works)
-    prompts = list(prompt_generator.generate(
-        prompt_formatter=mcq_bias_pfromatter
+    prompts = list(
+        prompt_generator.generate(
+            prompt_formatter=mcq_pfromatter,
+            start=3611
     ))
     # generate responses
     ollama.batch_requests(

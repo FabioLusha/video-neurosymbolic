@@ -10,7 +10,7 @@ services:
       - OLLAMA_LOG=debug
       - OLLAMA_DEBUG=1
     user: "${UID-1142}:${GID-1142}"
-    ports:
+    ports:  
       - "11434:11434"
     volumes:
       - /home/lusha/storage/ollama/ollama_models:/.ollama 
@@ -20,7 +20,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              device_ids: ["1"]
               capabilities: [gpu]
     cpuset: "12-15"
     restart: "no"

@@ -6,14 +6,14 @@ networks:
     external: true
 
 services:
-  lusha_bias_check:
+  lusha_llama3b_oneshot:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
     build: .
-    container_name: lusha_req_gen
+    container_name: lusha_req_mng
     user: "${UID-1142}:${GID-1142}"
     
     deploy:
