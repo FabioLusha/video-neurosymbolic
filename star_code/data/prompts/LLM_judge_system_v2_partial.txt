@@ -13,4 +13,5 @@ asked in the question.
 - Do not penalize predictions that make assumptions outside the provided context.
 - Focus more on the similarity between the provided answer and the ground truth answer.
 - Answers should be judged on semantic equivalence rather than literal character matching.
+- The ground truth is the true answer to the question and its validity is not questionable
 - 
