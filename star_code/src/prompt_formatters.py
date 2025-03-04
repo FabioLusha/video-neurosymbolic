@@ -58,7 +58,7 @@ class MCQPromptWoutSTSG(PromptFormatter):
 class LlmAsJudgePrompt(PromptFormatter):
 
     def __init__(self, prompt_format, predictions_path,
-                 sytem_prompt_format=None):
+                 system_prompt_format=None):
 
         self.system_prompt_format = system_prompt_format
         self.prompt_format = prompt_format
@@ -74,7 +74,8 @@ class LlmAsJudgePrompt(PromptFormatter):
                 {json.loads(line)['qid']: json.loads(line)
                  for line in in_f.readlines()}
 
-    def format_sytem(self, sample):
+    def format_system(self, sample):
+        args = dict()
         args['gt_answer'] = sample['choices'][str(sample['answer'])]
 
         return self.system_prompt_format.format(**args)
@@ -106,4 +107,4 @@ class LlmAsJudgePrompt(PromptFormatter):
         return ''.join(prompt)
 
     def format(self, sample):
-        return self.fromat_user(sample)
+        return self.format_user(sample)

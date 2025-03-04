@@ -44,15 +44,15 @@ def main():
     # 
     # mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
-    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system.txt')
+    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system_v2_partial.txt')
     llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
 
-    mispredictions_filepath = 'outputs/responses_deepseek-r1:7b_20250219_13:52:42.jsonl'
+    mispredictions_filepath = 'data/llama3b_correct.jsonl'
     judge_pformatter = pf.LlmAsJudgePrompt(
         llm_judge_usr_prompt, mispredictions_filepath)
     
-    # with open(mispredictions_filepath, 'r') as f:
-    #     ids = [json.loads(line)['question_id'] for line in f.readlines()]
+    with open(mispredictions_filepath, 'r') as f:
+        ids = [json.loads(line)['qid'] for line in f.readlines()]
 
 
     # Initialize Ollama manager
@@ -88,7 +88,8 @@ def main():
     # test start parm actually works)
     prompts = list(
         prompt_generator.generate(
-            prompt_formatter=judge_pformatter
+            prompt_formatter=judge_pformatter,
+            ids=ids
     ))
     # generate responses
     ollama.batch_requests(
