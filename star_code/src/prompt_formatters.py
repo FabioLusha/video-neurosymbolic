@@ -57,7 +57,10 @@ class MCQPromptWoutSTSG(PromptFormatter):
 
 class LlmAsJudgePrompt(PromptFormatter):
 
-    def __init__(self, prompt_format, predictions_path):
+    def __init__(self, prompt_format, predictions_path,
+                 sytem_prompt_format=None):
+
+        self.system_prompt_format = system_prompt_format
         self.prompt_format = prompt_format
 
         if not predictions_path.endswith('.jsonl'):
@@ -71,7 +74,12 @@ class LlmAsJudgePrompt(PromptFormatter):
                 {json.loads(line)['qid']: json.loads(line)
                  for line in in_f.readlines()}
 
-    def format(self, sample):
+    def format_sytem(self, sample):
+        args['gt_answer'] = sample['choices'][str(sample['answer'])]
+
+        return self.system_prompt_format.format(**args)
+
+    def format_user(self, sample):
         args = dict()
 
         qid = sample['question_id']
@@ -82,3 +90,20 @@ class LlmAsJudgePrompt(PromptFormatter):
         args['prediction'] = self.predictions[qid]['response']
 
         return self.prompt_format.format(**args)
+
+    def raw_format(self, sample):
+        prompt = [
+            '<|begin_of_text|>',
+            '<|start_header_id|>system<|end_header_id|>',
+            self.format_system(sample),
+            '<|eot_id|>',
+            '<start_header_id|>user<|end_header_id|>',
+            self.format_user(sample),
+            '<|eot_id|>',
+            '<start_header_id|>assistant<|end_header_id|>'
+        ]
+
+        return ''.join(prompt)
+
+    def format(self, sample):
+        return self.fromat_user(sample)
