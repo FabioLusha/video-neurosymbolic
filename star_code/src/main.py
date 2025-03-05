@@ -44,8 +44,8 @@ def main():
     # 
     # mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
-    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system_v2_partial.txt')
-    llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user.txt')
+    llm_judge_sys_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_system_v2.txt')
+    llm_judge_usr_prompt = _load_prompt_fromfile('data/prompts/LLM_judge_user_v2.txt')
 
     mispredictions_filepath = 'data/llama3b_correct.jsonl'
     judge_pformatter = pf.LlmAsJudgePrompt(
