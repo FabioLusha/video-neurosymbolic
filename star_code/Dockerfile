@@ -6,12 +6,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy your code and data files
-COPY src/ src/
+# Create project directories
+RUN mkdir -p src outputs data
 
-
-# Create directory for outputs
-RUN mkdir -p outputs
 
 # run the script in unbuffered mode
 CMD ["python", "-u", "src/main.py"]
