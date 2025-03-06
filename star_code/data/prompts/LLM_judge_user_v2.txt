@@ -4,13 +4,13 @@ Please evaluate the following question-answer pair:
 {question}
 </question>
 
-<ground_truth_answer>
-{gt_answer}
-<ground_truth_answer>
-
 <give_answer>
 {prediction}
 </given_answer>
+
+<ground_truth_answer>
+{gt_answer}
+</ground_truth_answer>
 
 - Provide your evaluation as a correct/incorrect prediction along with the score where the score is an
 integer value between 0 (fully wrong) and 5 (fully correct). The middle score provides the percentage of
@@ -18,7 +18,8 @@ correctness.
 - Please generate the response in the form of a Python dictionary string with keys 'pred', 'score' and
 'reason', where value of 'pred' is a string of 'correct' or 'incorrect', value of 'score' is in INTEGER, not STRING
 and value of 'reason' should provide the reason behind the decision.
-- Your explanation should begin by quoting the relevant section of <given_answer> that contributed to the model's final answer.
+- Your explanation should begin by quoting the relevant section of <given_answer> that contributed to the model's final answer and after
+provide your reasoning behind you decision
 - Only provide the Python dictionary string.
 For example, your response should look like this: {{'reason': reason, 'pred': 'correct', 'score': 4, }}.
 Your reasFirst locate and quote the relevant parts of the <given_answer> that help determine the ultimate given
