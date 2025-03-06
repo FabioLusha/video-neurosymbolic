@@ -6,14 +6,14 @@ networks:
     external: true
 
 services:
-  lusha_llama8b_judge:
+  req_manager:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11434
       - PYTHONUNBUFFERED=1
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
-    build: .
-    container_name: lusha_req_mng
+    image: lusha/star_req_manager 
+    container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
     
     deploy:

@@ -20,7 +20,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["4"]
+              device_ids: ["5"]
               capabilities: [gpu]
     cpuset: "12-15"
     restart: "no"
