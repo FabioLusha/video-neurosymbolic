@@ -1,24 +1,29 @@
 Please evaluate the following question-answer pair:
-Question: 
-[START QUESTION]
+
+<question>
 {question}
-[END QUESTION]
+</question>
 
-Ground truth correct Answer: 
-[START ANSWER]
-{gt_answer}
-[END ANSWER]
-
-Predicted Answer:
-[START PREDICTION]
+<given_answer>
 {prediction}
-[END Prediction]
+</given_answer>
 
-Provide your evaluation as a correct/incorrect prediction along with the score where the score is an
-integer value between 0 (fully wrong) and 5 (fully correct). The middle score provides the percentage of
-correctness.
-Please generate the response in the form of a Python dictionary string with keys 'pred', 'score' and
-'reason', where value of 'pred' is a string of 'correct' or 'incorrect', value of 'score' is in INTEGER, not STRING
-and value of 'reason' should provide the reason behind the decision.
-Only provide the Python dictionary string.
-For example, your response should look like this: {{'pred': 'correct', 'score': 4, 'reason': reason}}.
+<ground_truth_answer>
+{gt_answer}
+</ground_truth_answer>
+
+- Provide your evaluation as a correct/incorrect prediction along with a score, where the score is an integer value between 0 (fully wrong) and 5 (fully correct). The score reflects the degree of correctness:
+  - 5: Fully correct, semantically equivalent to the ground truth.
+  - 4: Mostly correct, with minor inaccuracies or omissions.
+  - 3: Partially correct, with some significant inaccuracies.
+  - 2: Mostly incorrect, but with some relevant information.
+  - 1: Slightly relevant, but largely incorrect.
+  - 0: Fully incorrect or irrelevant.
+
+- Generate the response in the form of a Python dictionary string with keys 'reason', 'pred', and 'score'. The value of 'pred' should be a string of 'correct' or 'incorrect', the value of 'score' should be an INTEGER (not a string), and the value of 'reason' should provide the reasoning behind the decision.
+- Your explanation should begin by quoting the relevant section of <given_answer> that contributed to the model's final answer, followed by your reasoning.
+- Your explanation should be fully enclosed in the 'reason' parameter.
+- Only provide the Python dictionary string.
+
+For example, your response should look like this:
+{'reason': 'The given answer "The capital of France is Paris." is semantically equivalent to the ground truth "Paris."', 'pred': 'correct', 'score': 5}
