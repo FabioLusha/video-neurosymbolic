@@ -58,9 +58,9 @@ class OllamaRequestManager:
                 "Error while connecting to ollama") from e
 
     def unload_model(self):
-        requests.get(
+        requests.post(
             f'{self.base_url}/api/generate',
-            params={
+            json={
                 'model': self.ollama_params['model'],
                 'keep_alive': 0
             }
@@ -76,9 +76,9 @@ class OllamaRequestManager:
             # adding the prompt param to the other ollama_params
             self.ollama_params['prompt'] = prompt
 
-            server_response = requests.get(
+            server_response = requests.post(
                 f'{self.base_url}/api/generate',
-                params=self.ollama_params,
+                json=self.ollama_params,
                 timeout=req_timeout,
                 stream=True
             )
