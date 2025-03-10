@@ -94,9 +94,11 @@ def main():
     )
 
     # generate responses
-    ollama.batch_requests(
-        prompts=prompts
-    )
+    ollama.load_model()
+    ollama.batch_requests(prompts=prompts)
+    # don't unload the model manually
+    # there might be other processes making
+    # request
 
 
 def _load_prompt_fromfile(filename):

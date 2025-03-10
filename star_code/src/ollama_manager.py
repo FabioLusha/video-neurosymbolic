@@ -42,19 +42,42 @@ class OllamaRequestManager:
 
         return ScaffoldLogger()
 
+    def load_model(self):
+        # An empty prompt will cause ollama to load the specified model
+        try:
+            requests.post(
+                f'{self.base_url}/api/generate',
+                json={'model': self.ollama_params['model']}
+            )
+        except requests.ConnectionError as e:
+            raise requests.ConnectionError(
+                "Error while connecting to ollama") from e
+        except requests.RequestException as e:
+            raise requests.RequestExcetpion(
+                "Error while connecting to ollama") from e
+
+    def unload_model(self):
+        requests.get(
+            f'{self.base_url}/api/generate',
+            params={
+                'model': self.ollama_params['model'],
+                'keep_alive': 0
+            }
+        )
+
     def make_request(self, prompt, req_timeout=60):
 
         if self.ollama_params['model'].startswith('llama8'):
             req_timeout = 180
-        
+
         token_stream = []
         try:
             # adding the prompt param to the other ollama_params
             self.ollama_params['prompt'] = prompt
 
-            server_response = requests.post(
+            server_response = requests.get(
                 f'{self.base_url}/api/generate',
-                json=self.ollama_params,
+                params=self.ollama_params,
                 timeout=req_timeout,
                 stream=True
             )
@@ -62,7 +85,6 @@ class OllamaRequestManager:
             # Raise an exception for HTTP errors
             server_response.raise_for_status()
 
-            
             for chunk in server_response.iter_lines():
                 # Filter out keep-alive chunks
                 if chunk:
@@ -75,13 +97,14 @@ class OllamaRequestManager:
                         elapsed = data.get('eval_duration', '')
                         ntokens = data.get('eval_count', '')
 
-                        print(f"\n\nResponse at: {ntokens/elapsed * 10**9:.1f} tk/s")
+                        print(f"\n\nResponse at: {
+                              ntokens/elapsed * 10**9:.1f} tk/s")
                         break
 
                     token = data.get('response', '')
                     token_stream.append(token)
                     print(token, end='', flush=True)
-                    
+
         except requests.RequestException as e:
             response_sofar = ''.join(token_stream)
             e.response = response_sofar
@@ -111,7 +134,12 @@ class OllamaRequestManager:
 
         print(f"Responses will be saved to: {output_file}")
         print(f"Errors will be logged to: {error_file}")
-        print("============== Starting Response Generation ==============")
+
+        str_max_len = 79
+        print(f" Loading model {
+              self.ollama_params['model']} ".center(str_max_len, '='))
+
+        print(" Starting Response Generation ".center(str_max_len, '='))
 
         # Using line buffering
         with open(output_file, 'w', buffering=1, encoding='utf-8') as res_f:
@@ -174,7 +202,7 @@ class OllamaRequestManager:
 
                         print(f"Error at iteration {i}\n"
                               f"Prompt id:{id}\n"
-                              f"Look at the log file for specifics on the error"
+                              "Look at the log file for specifics on the error"
                               )
 
                 finally:
