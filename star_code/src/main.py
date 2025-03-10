@@ -94,7 +94,7 @@ def main():
     )
 
     # generate responses
-    ollama.load_model()
+    #ollama.load_model()
     ollama.batch_requests(prompts=prompts)
     # don't unload the model manually
     # there might be other processes making

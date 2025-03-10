@@ -43,6 +43,7 @@ class OllamaRequestManager:
         return ScaffoldLogger()
 
     def load_model(self):
+        print(f" Loading model {self.ollama_params['model']} ".center(80, '='))
         # An empty prompt will cause ollama to load the specified model
         try:
             requests.post(
@@ -97,8 +98,7 @@ class OllamaRequestManager:
                         elapsed = data.get('eval_duration', '')
                         ntokens = data.get('eval_count', '')
 
-                        print(f"\n\nResponse at: {
-                              ntokens/elapsed * 10**9:.1f} tk/s")
+                        print(f"\n\nResponse at: {ntokens/elapsed * 10**9:.1f} tk/s")
                         break
 
                     token = data.get('response', '')
@@ -134,12 +134,7 @@ class OllamaRequestManager:
 
         print(f"Responses will be saved to: {output_file}")
         print(f"Errors will be logged to: {error_file}")
-
-        str_max_len = 79
-        print(f" Loading model {
-              self.ollama_params['model']} ".center(str_max_len, '='))
-
-        print(" Starting Response Generation ".center(str_max_len, '='))
+        print(" Starting Response Generation ".center(80, '='))
 
         # Using line buffering
         with open(output_file, 'w', buffering=1, encoding='utf-8') as res_f:
@@ -271,7 +266,7 @@ class STARPromptGenerator:
         try:
             # Open file with line buffering
             with open(output_file, 'w', buffering=1, encoding='utf-8') as f:
-                for prompt_data in self.generate(prompt_formatter, limit, mcq):
+                for prompt_data in self.generate(prompt_formatter, start, limit):
                     f.write(json.dumps(prompt_data, ensure_ascii=False) + '\n')
                     f.flush()
 
