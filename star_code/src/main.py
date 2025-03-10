@@ -47,7 +47,7 @@ def main():
     llm_judge_usr_prompt = _load_prompt_fromfile(
         'data/prompts/LLM_judge_user_v2.txt')
 
-    mispredictions_filepath = 'data/llama3b_correct.jsonl'
+    mispredictions_filepath = 'data/llama3b_extracted_ans.jsonl'
     judge_pformatter = pf.LlmAsJudgePrompt(
         llm_judge_usr_prompt, mispredictions_filepath)
 
