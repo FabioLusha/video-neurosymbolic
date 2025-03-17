@@ -100,11 +100,11 @@ class PromptFormatterTest(unittest.TestCase):
             prediction=pred
         )
 
-        with tempfile.NamedTemporaryFile(mode="w+", delete=True) as temp_file:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix='.jsonl', delete=True) as temp_file:
             # Write some content to the file
             data = {
-                'question_id': self.sample['question_id'],
-                'prediction': pred
+                'qid': self.sample['question_id'],
+                'response': pred
             }
             json.dump(data, temp_file)
 

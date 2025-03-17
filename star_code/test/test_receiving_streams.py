@@ -1,63 +1,90 @@
 import json
+import os
+import subprocess
 import sys
-sys.path.append('../src')
+import tempfile
+import time
+import unittest
 
+sys.path.append("../src")
+import prompt_formatters as pf
 
 # noqa: E402 - disables the warning for this line
-from ollama_manager import STARPromptGenerator, OllamaRequestManager  # noqa: E402
-
-# Test data - creating a small JSON file with sample data
-test_data = [
-    {
-        "question_id": f"q{i}",
-        "question": f"Test question {i}",
-        "stsg": f"Test graph {i}"
-    } for i in range(10)
-]
-
-# Save test data
-with open('test_data.json', 'w') as f:
-    json.dump(test_data, f)
-
-# Create a simple system prompt
-with open('test_system_prompt.txt', 'w') as f:
-    f.write("You are a helpful assistant.")
-
-# Test script
+from ollama_manager import OllamaRequestManager  # noqa: E402
+from ollama_manager import STARPromptGenerator
 
 
-def main():
-    # Initialize the generator
-    generator = STARPromptGenerator(
-        input_filename='test_data.json'
-    )
+class StreamingReceiverTestUnit(unittest.TestCase):
+    def setUp(self):
+        # Test data - creating a small JSON file with sample data
+        test_data = [
+            {
+                "question_id": f"q{i}",
+                "question": f"Test question {i}",
+                "stsg": f"Test graph {i}",
+            }
+            for i in range(10)
+        ]
 
-    prompt_format = "QUESTION: {question}\n"\
-                    "STSG: {stsg}"
-    
-    with open('test_system_prompt.txt', 'r') as f:
-          prompt_format = '\n'.join([f.read(), prompt_format])
-          
-    # Initialize the Ollama manager
-    manager = OllamaRequestManager(
-        base_url='http://localhost:8000',
-        ollama_params={
-            'model': 'llama2'
-        }
-    )
+        # Save test data
+        self.temp_data_file = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
 
-    # Create output directory
-    output_dir = "test_output"
+        with open(self.temp_data_file.name, "w") as f:
+            json.dump(test_data, f)
 
-    # Get first 10 prompts
-    prompts = []
-    for i, prompt in enumerate(generator.generate(prompt_format)):
-        if i >= 10:
-            break
-        prompts.append(prompt)
+        self.temp_sys_prompt_file = tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        )
 
-    # Process the prompts
-    manager.batch_requests(prompts, output_dir)
+        # Create a simple system prompt
+        with open(self.temp_sys_prompt_file.name, "w") as f:
+            f.write("You are a helpful assistant.")
+
+        # Start the server
+        self.server = subprocess.Popen(["python", "scaffold_server.py"])
+        print("Started the Scaffold Server")
+
+        # Wait for the server to start
+        time.sleep(2)
+
+    def tearDown(self):
+        # Close and Remove temporary files
+        for temp_file in [self.temp_data_file, self.temp_sys_prompt_file]:
+            temp_file.close()
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
+        if self.server:
+            self.server.terminate()  # Gracefully terminate the server
+            self.server.wait()  # Wait for the processer to exit
+
+            print("Stopped sacffold server")
+
+    def test_streaming_receiver(self):
+        # Initialize the generator
+        generator = STARPromptGenerator(input_filename=self.temp_data_file.name)
+
+        prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+
+        pformatter = pf.OpenEndedPrompt(prompt_format)
+        # Initialize the Ollama manager
+
+        manager = OllamaRequestManager(
+            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+        )
+
+        # Create output directory
+        output_filename = "test_output/out_resp.jsonl"
+
+        # Get first 10 prompts
+        prompts = []
+        for i, prompt in enumerate(generator.generate(pformatter)):
+            if i >= 10:
+                break
+            prompts.append(prompt)
+
+        # Process the prompts
+        manager.batch_requests(prompts, output_filename)
 
 
 if __name__ == "__main__":
