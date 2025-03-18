@@ -9,7 +9,6 @@ IMPORTANT CLARIFICATIONS:
 
 INSTRUCTIONS:
 - Read the entire Spatio-Temporal Scene-Graphs in chronological order and pay attention at the order of how events unfold.
-- Reason about the answer step by step.
-- Include key events or relationship that help you in determing the answer
-- After your reasoning, choose one of the alternatives and write it in a new line introduced by "A:".
+- Read the question and reason about the answer step by step.
+- In your answer include key events or relationships that help you in determing the correct answer.
 - Be careful to reproduce the chosen alternative as it is presented.

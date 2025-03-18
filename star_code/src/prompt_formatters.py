@@ -28,11 +28,10 @@ class MCQPrompt(PromptFormatter):
 
         args['question'] = sample['question']
 
-        choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
-        args['c1'] = choices[0]
-        args['c2'] = choices[1]
-        args['c3'] = choices[2]
-        args['c4'] = choices[3]
+        args['c1'] = sample['choices']['0']
+        args['c2'] = sample['choices']['1']
+        args['c3'] = sample['choices']['2']
+        args['c4'] = sample['choices']['3']
 
         args['stsg'] = str(sample['stsg'])
 
@@ -47,10 +46,10 @@ class MCQPromptWoutSTSG(PromptFormatter):
         args['question'] = sample['question']
 
         choices = [f"{key}. {val}" for key, val in sample['choices'].items()]
-        args['c1'] = choices[0]
-        args['c2'] = choices[1]
-        args['c3'] = choices[2]
-        args['c4'] = choices[3]
+        args['c1'] = sample['choices']['0']
+        args['c2'] = sample['choices']['1']
+        args['c3'] = sample['choices']['2']
+        args['c4'] = sample['choices']['3']
 
         return self.prompt_format.format(**args)
 

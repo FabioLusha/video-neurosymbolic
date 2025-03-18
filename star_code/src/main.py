@@ -8,6 +8,13 @@ from ollama_manager import OllamaRequestManager, STARPromptGenerator
 
 SEED = 13471225022025
 
+MODELS = [
+    "llama3.2",
+    "llama3.1:8b",
+    "deepseek-r1:1.5b",
+    "deepseek-r1:7b"
+    "phi3:3.8b"
+]
 
 def load_open_qa_prompts():
     system_prompt = _load_prompt_fromfile("data/system_prompt.txt")
@@ -22,7 +29,17 @@ def load_mcq_prompts():
     mcq_system_prompt = _load_prompt_fromfile(
         "data/prompts/MCQ_system_prompt_v2_oneshot.txt"
     )
-    mcq_pformat = "Q: {question}\n" "{c1}\n{c2}\n{c3}\n{c4}\n" "STSG: {stsg}\n" "A:"
+    mcq_pformat = '''\
+        Q: {question}
+        Alternatives:
+        A. {c1}
+        B. {c2}
+        C. {c3}
+        D. {c4}
+
+        STSG: {stsg}
+        A:
+        '''
     mcq_pformatter = pf.MCQPrompt(mcq_pformat)
 
     return mcq_system_prompt, mcq_pformatter
@@ -36,7 +53,10 @@ def load_mcq_html_prompts():
         <Question>
         {question}
         Alternatives:
-        {c1}\n{c2}\n{c3}\n{c4}
+        A. {c1}
+        B. {c2}
+        C. {c3}
+        D. {c4}
         <\Question>
         """
 
@@ -47,16 +67,18 @@ def load_mcq_html_prompts():
 
 def load_mcq_zs_cot_prompts():
     sys_prompt = _load_prompt_fromfile(
-        "data/zero-shot-CoT/MCQ_system_prompt_ZS_CoT.txt"
-    )
-    user_prompt = _load_prompt_fromfile("data/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt")
+        "data/prompts/zero-shot-CoT/MCQ_system_prompt_ZS_CoT.txt"
+        )
+    user_prompt = _load_prompt_fromfile(
+        "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt"
+        )
 
     mcq_pformatter = pf.MCQPrompt(user_prompt)
 
     return sys_prompt, mcq_pformatter
 
 
-def load_bias_check_prompt():
+def load_bias_check_prompts():
     # PROMPTS FOR BIAS CHECK - I.E. QUESTION WITHOUT STSG
     mcq_system_prompt_bias = _load_prompt_fromfile(
         "data/prompts/system_prompt_bias_check.txt"
@@ -110,7 +132,7 @@ def run_with_prompts(
 
     # Initialize the prompt generator with the appropriate file
     if not input_filepath:
-        input_filename = "data/datasets/STAR_QA_and_stsg_val.json"  # Default to MCQ
+        input_filepath = "data/datasets/STAR_QA_and_stsg_val.json"  # Default to MCQ
 
     # Handle ids file
     ids = None
@@ -137,7 +159,7 @@ def main():
         "mcq": load_mcq_prompts,
         "mcq_html": load_mcq_html_prompts,
         "mcq_zs_cot": load_mcq_zs_cot_prompts,
-        "bias_check": load_bias_check_prompt,
+        "bias_check": load_bias_check_prompts,
         "judge": load_llm_as_judge_prompts,
     }
 
@@ -151,8 +173,9 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="llama3.1:8b",
-        help="Ollama model to use (default: llama3.1:8b)",
+        choices=MODELS,
+        default="llama3.2",
+        help="Ollama model to use (default: llama3.2:latests - 3b)",
     )
     parser.add_argument(
         "--input-file", help="Input dataset file path (defaults based on prompt type)"
@@ -185,13 +208,14 @@ def main():
     load_func = prompt_types[args.prompt_type]
     system_prompt, prompt_formatter = load_func()
 
+    ids_file_path = args.ids_file
     # Run with the selected configuration
     run_with_prompts(
         system_prompt=system_prompt,
         prompt_formatter=prompt_formatter,
         model_name=args.model,
         input_filepath=input_file,
-        ids_filepath=ids_file,
+        ids_filepath=ids_file_path,
     )
 
 

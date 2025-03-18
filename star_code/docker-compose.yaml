@@ -12,10 +12,11 @@ services:
       - PYTHONUNBUFFERED=1
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
-    image: lusha/star_req_manager 
+    image: lusha/star_req_manager
+    entrypoint: ['python']
+    command: ['-u', 'src/main.py', '--prompt-type', 'mcq_zs_cot']
     container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
-    
     deploy:
       resources:
         reservations:

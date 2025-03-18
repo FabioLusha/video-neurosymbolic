@@ -1,7 +1,7 @@
 Please carefully read the following Spatio-Temporal Scene Graph delimited by the <STSG> tags and provide an answer to the question below:
 
 <STSG>
-{question}
+{stsg}
 </STSG>
 
 Given the following question:
@@ -15,6 +15,7 @@ A. {c1}
 B. {c2}
 C. {c3}
 D. {c4}
+</Alternatives>
 
 Provide an answer to the above question reasoning step by step on the Spatio-Temporal Scene-Graph (STSG) and choosing one of the alternatives.
 Your answer must be enclosed between the tags <Final Answer></Final Answer>
