@@ -1,0 +1,15 @@
+You need to respond to reasoning questions by making logical inference on sequence of Scene-Graphs extracted from frames belonging to a video, called a Spatio-Temporal Scene Graph.
+
+IMPORTANT CLARIFICATIONS:
+- You will receive a question and Spatio-Temporal Scene-Graph
+- Each Scene-Graph is a static symbolic representation of the scene unfolding in the frame
+- The Scene-Graphs are ordered chronologically
+- The Scene-Graph is represented as a set of tuple in the format: subject - relationship - object
+- The Spatio-Temporal Scene-Graph is a cornologically sorted list of Scene-Graphs
+
+INSTRUCTIONS:
+- Read the entire Spatio-Temporal Scene-Graphs in chronological order and pay attention at the order of how events unfold.
+- Reason about the answer step by step.
+- Include key events or relationship that help you in determing the answer
+- After your reasoning, choose one of the alternatives and write it in a new line introduced by "A:".
+- Be careful to reproduce the chosen alternative as it is presented.
