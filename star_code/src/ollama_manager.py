@@ -4,23 +4,9 @@ import os
 import traceback
 from datetime import datetime
 
-import prompt_formatters as pf
 import requests
 
-
-class Chat:
-    def __init__(ollama_client):
-        self.client = ollama_client
-        self.chat_history = []
-
-    def send_msg(self, content):
-        self.chat_history.append({"role": "user", "content": content})
-
-        response = ollama_client.chat_completion(chat_history)
-
-        self.chat_history.append(
-            {"role": response.get("role", ""), "content": response.get("content", "")}
-        )
+import prompt_formatters as pf
 
 
 class OllamaRequestManager:
@@ -89,7 +75,7 @@ class OllamaRequestManager:
     def chat_completion(self, messages, req_timeout=60):
         return self.ollama_completion_request(
             endpoint="chat",
-            payload={**self.ollama_parmas, "messages": messages},
+            payload={**self.ollama_params, "messages": messages},
             req_timeout=req_timeout,
         )
 
@@ -131,15 +117,36 @@ class OllamaRequestManager:
                     print(result["token_stream"][-1], end="", flush=True)
 
         except requests.RequestException as e:
-            e.result = result
+            e.response = handler.finalize_result(result)
             raise
 
         return handler.finalize_result(result)
 
-    def batch_requests(self, prompts, output_file_path=None):
-        # Create logs directory if it doesn't exist
-        output_dir = "outputs"
-        os.makedirs(output_dir, exist_ok=True)
+    def batch_request(self, payloads, endpoint, kwargs=None):
+        consectuive_errors = 0
+        for i, sample in enumerate(payloads, 1):
+            id = sample["qid"]
+            payload = sample["payload"]
+
+            try:
+                print(f"\nGenerating respone for iteration {i} - id: {id}")
+                response = self.ollama_completion_request(payload, endpoint, **kwargs)
+
+                yield ("ok", self, id, payload, response)
+
+            except requests.RequestException as e:
+                yield ("error", self, id, payload, getattr(e, "response"))
+
+    def pipleine_processor(self, generator, *funcs):
+        # kwargs are the args for generator
+        for e in generator:
+            res = e
+            for f in funcs:
+                res = f(res)
+
+        yield res
+
+    def save_task(self, generator, output_file_path=None):
         start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
 
         if output_file_path:
@@ -149,11 +156,14 @@ class OllamaRequestManager:
 
             # Create directory if it doesn't exists
             dir = os.path.dirname(output_file_path)
-            if dir != "":
-                output_dir = dir
-                os.makedirs(dir)
+            output_dir = dir if dir != "" else "outputs"
+            os.makedirs(dir)
 
         else:
+            # Create logs directory if it doesn't exist
+            output_dir = "outputs"
+            os.makedirs(output_dir, exist_ok=True)
+
             # Saving the response as JSON in jsonl format,
             # where each json object is saved in one line
             output_file_path = os.path.join(
@@ -169,76 +179,165 @@ class OllamaRequestManager:
         print(" Starting Response Generation ".center(80, "="))
 
         # Using line buffering
-        with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
+        with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f, open(
+            error_file, "w", buffering=1, encoding="utf-8"
+        ) as error_f:
 
-            consecutive_errors = 0
-            error = False
-            for i, sample in enumerate(prompts, 1):
-                id = sample["qid"]
-                prompt = sample["prompt"]
+            for result in generator:
+                status = result.status
+                response = result.response
+                id = result.id
 
-                try:
-                    print(f"\nGenerating response for prompt {i}")
+                if status == "ok":
+                    # Create response object
+                    response_obj = {
+                        "qid": id,
+                        "response": response,
+                    }
 
-                    response = self.generate_completion(prompt)
-                    if response:
-                        # Create response object
-                        response_obj = {
-                            "qid": id,
-                            "response": response,
-                        }
+                    res_f.write(json.dumps(response_obj) + "\n")
+                    res_f.flush()
+                elif status == "error":
+                    error_msg = {
+                        "qid": id,
+                        "prompt": prompt,
+                        "response": response,
+                        "error": traceback.format_exc(),
+                        "timestamp": datetime.now().isoformat(),
+                    }
 
-                        res_f.write(json.dumps(response_obj) + "\n")
-                        res_f.flush()
+                    error_f.write(
+                        json.dumps(error_msg, indent=2, ensure_ascii=False) + "\n"
+                    )
+                    error_f.flush()
 
-                        error = False
-                        consecutive_errors = 0
+                    response_file_msg = {
+                        "qid": id,
+                        "response": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
+                        + response,
+                    }
 
-                except requests.RequestException as e:
-                    if error:
-                        consecutive_errors += 1
+                    res_f.write(json.dumps(response_file_msg) + "\n")
+                    res_f.flush()
 
-                    error = True
-                    with open(
-                        error_file, "a", buffering=1, encoding="utf-8"
-                    ) as error_f:
-                        result = getattr(e, "result")
-                        response = handler.finalize_result(result)
+                    print(
+                        f"Error at iteration {i}\n"
+                        f"Prompt id:{id}\n"
+                        "Look at the log file for specifics on the error"
+                    )
 
-                        error_msg = {
-                            "qid": id,
-                            "prompt": prompt,
-                            "response": response,
-                            "error": traceback.format_exc(),
-                            "timestamp": datetime.now().isoformat(),
-                        }
+                yield result
 
-                        error_f.write(
-                            json.dumps(error_msg, indent=2, ensure_ascii=False) + "\n"
-                        )
-                        error_f.flush()
+    def batch_generate(self, prompts, output_file_path=None):
+        def prompt_gen(prompts):
+            Result = namedtuple("status", "id", "response")
+            for prompt in prompts:
+                res = Result("ok", prompt["id"], prompt["prompt"])
+                yield res
 
-                        response_file_msg = {
-                            "qid": id,
-                            "response": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
-                            + response,
-                        }
+        self.save_task(prompt_gen(prompts))
 
-                        res_f.write(json.dumps(response_file_msg) + "\n")
-                        res_f.flush()
+    # def batch_generate(self, prompts, output_file_path=None):
+    #     if output_file_path:
+    #         # Create directory if it doesn't exist
+    #         if os.path.exists(output_file_path):
+    #             raise FileExistsError(f"The file {output_file_path} already exists!")
 
-                        print(
-                            f"Error at iteration {i}\n"
-                            f"Prompt id:{id}\n"
-                            "Look at the log file for specifics on the error"
-                        )
+    #         # Create directory if it doesn't exists
+    #         dir = os.path.dirname(output_file_path)
+    #         output_dir = dir if dir != "" else "outputs"
+    #         os.makedirs(dir)
 
-                finally:
-                    if consecutive_errors > 5:
-                        raise Exception(
-                            "There have been {5} consecutive errors!\n"
-                            "The process has stopped!"
-                        )
+    #     else:
+    #         # Create logs directory if it doesn't exist
+    #         output_dir = "outputs"
+    #         os.makedirs(output_dir, exist_ok=True)
+    #         start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+
+    #         # Saving the response as JSON in jsonl format,
+    #         # where each json object is saved in one line
+    #         output_file_path = os.path.join(
+    #             output_dir, f"responses_{self.model}_{start_timestamp}.jsonl"
+    #         )
+
+    #     error_file = os.path.join(
+    #         output_dir, f"errors_{self.model}_{start_timestamp}.txt"
+    #     )
+
+    #     print(f"Responses will be saved to: {output_file_path}")
+    #     print(f"Errors will be logged to: {error_file}")
+    #     print(" Starting Response Generation ".center(80, "="))
+
+    #     # Using line buffering
+    #     with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
+
+    #         consecutive_errors = 0
+    #         error = False
+    #         for i, sample in enumerate(prompts, 1):
+    #             id = sample["qid"]
+    #             prompt = sample["prompt"]
+
+    #             try:
+    #                 print(f"\nGenerating response for prompt {i}")
+
+    #                 response = self.generate_completion(prompt)
+    #                 if response:
+    #                     # Create response object
+    #                     response_obj = {
+    #                         "qid": id,
+    #                         "response": response,
+    #                     }
+
+    #                     res_f.write(json.dumps(response_obj) + "\n")
+    #                     res_f.flush()
+
+    #                     error = False
+    #                     consecutive_errors = 0
+
+    #             except requests.RequestException as e:
+    #                 if error:
+    #                     consecutive_errors += 1
+
+    #                 error = True
+    #                 with open(
+    #                     error_file, "a", buffering=1, encoding="utf-8"
+    #                 ) as error_f:
+    #                     response = getattr(e, "response")
+
+    #                     error_msg = {
+    #                         "qid": id,
+    #                         "prompt": prompt,
+    #                         "response": response,
+    #                         "error": traceback.format_exc(),
+    #                         "timestamp": datetime.now().isoformat(),
+    #                     }
+
+    #                     error_f.write(
+    #                         json.dumps(error_msg, indent=2, ensure_ascii=False) + "\n"
+    #                     )
+    #                     error_f.flush()
+
+    #                     response_file_msg = {
+    #                         "qid": id,
+    #                         "response": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
+    #                         + response,
+    #                     }
+
+    #                     res_f.write(json.dumps(response_file_msg) + "\n")
+    #                     res_f.flush()
+
+    #                     print(
+    #                         f"Error at iteration {i}\n"
+    #                         f"Prompt id:{id}\n"
+    #                         "Look at the log file for specifics on the error"
+    #                     )
+
+    #             finally:
+    #                 if consecutive_errors > 5:
+    #                     raise Exception(
+    #                         "There have been {5} consecutive errors!\n"
+    #                         "The process has stopped!"
+    #                     )
 
 
 # Handler classes for different API endpoints
@@ -342,3 +441,153 @@ class STARPromptGenerator:
 
         except IOError as e:
             raise IOError("Error saving prompts") from e
+
+
+class ChatServer:
+    def __init__(self, ollama_client):
+        self.client = ollama_client
+        self.chat_history = []
+
+    def send_msg(self, content):
+        self.chat_history.append({"role": "user", "content": content})
+
+        response = self.client.chat_completion(self.chat_history)
+
+        self.chat_history.append(
+            {"role": response.get("role", ""), "content": response.get("content", "")}
+        )
+        return response
+
+    def flush_chat(self):
+        self.chat_history = []
+
+
+class AutoChat:
+
+    def __init__(self, chat_server=None, ollama_client=None):
+        self.chat = chat_server
+        if chat_server is None:
+            if ollama_client is None:
+                raise ValueError(
+                    "Your have to provide argument between chat_server or ollama_clinet"
+                )
+            self.chat = ChatServer(ollama_client)
+
+    def batch_chat(self, prompts, auto_reply_f, output_file_path=None):
+        start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+        if output_file_path:
+            # Create directory if it doesn't exist
+            if os.path.exists(output_file_path):
+                raise FileExistsError(f"The file {output_file_path} already exists!")
+
+            # Create directory if it doesn't exists
+            dir = os.path.dirname(output_file_path)
+            output_dir = dir if dir != "" else "outputs"
+            os.makedirs(dir)
+
+        else:
+            # Create logs directory if it doesn't exist
+            output_dir = "outputs"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Saving the response as JSON in jsonl format,
+            # where each json object is saved in one line
+            output_file_path = os.path.join(
+                output_dir, f"responses_{self.model}_{start_timestamp}.jsonl"
+            )
+
+        error_file = os.path.join(
+            output_dir, f"errors_{self.chat.client.model}_{start_timestamp}.txt"
+        )
+
+        print(f"Responses will be saved to: {output_file_path}")
+        print(f"Errors will be logged to: {error_file}")
+        print(" Starting Response Generation ".center(80, "="))
+
+        # Using line buffering
+        with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
+
+            consecutive_errors = 0
+            error = False
+            for i, sample in enumerate(prompts, 1):
+                self.chat.flush_chat()
+
+                id = sample["qid"]
+                prompt = sample["prompt"]
+
+                try:
+                    print(f"\nGenerating response for prompt {i}")
+
+                    # The call is synchronous, therfore we wait for the response
+                    response = self.chat.send_msg(prompt)
+                    # Generate reply
+
+                    reply, next_reply_f = auto_reply_f(response)
+                    while reply is not None:
+                        self.chat.send_msg(reply)
+                        reply, next_reply_f = next_reply_f(response)
+
+                    if self.chat.chat_history:
+                        # Create response object
+                        response_obj = {
+                            "qid": id,
+                            "chat_history": self.chat.chat_history,
+                        }
+
+                        res_f.write(json.dumps(response_obj) + "\n")
+                        res_f.flush()
+
+                        error = False
+                        consecutive_errors = 0
+
+                except requests.RequestException as e:
+                    if error:
+                        consecutive_errors += 1
+
+                    error = True
+                    with open(
+                        error_file, "a", buffering=1, encoding="utf-8"
+                    ) as error_f:
+                        response = getattr(e, "response")
+
+                        self.chat.chat_history.append(
+                            {
+                                "role": response["role"],
+                                "content": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n\n"
+                                + response["content"],
+                            }
+                        )
+
+                        error_msg = {
+                            "qid": id,
+                            "prompt": prompt,
+                            "chat_history": self.chat.chat_history,
+                            "error": traceback.format_exc(),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+
+                        error_f.write(
+                            json.dumps(error_msg, indent=2, ensure_ascii=False) + "\n"
+                        )
+                        error_f.flush()
+
+                        response_file_msg = {
+                            "qid": id,
+                            "chat_history": self.chat.chat_history,
+                        }
+
+                        res_f.write(json.dumps(response_file_msg) + "\n")
+                        res_f.flush()
+
+                        print(
+                            f"Error at iteration {i}\n"
+                            f"Prompt id:{id}\n"
+                            "Look at the log file for specifics on the error"
+                        )
+
+                finally:
+                    if consecutive_errors > 5:
+                        raise Exception(
+                            "There have been {5} consecutive errors!\n"
+                            "The process has stopped!"
+                        )

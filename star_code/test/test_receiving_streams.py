@@ -8,6 +8,7 @@ import unittest
 
 sys.path.append("../src")
 import prompt_formatters as pf
+from batch_processor import BatchProcessor
 
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
@@ -58,17 +59,16 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             self.server.terminate()  # Gracefully terminate the server
             self.server.wait()  # Wait for the processer to exit
 
-            print("Stopped sacffold server")
+            print("Stopped Scaffold server")
 
     def test_streaming_receiver(self):
         # Initialize the generator
         generator = STARPromptGenerator(input_filename=self.temp_data_file.name)
 
         prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
-
         pformatter = pf.OpenEndedPrompt(prompt_format)
-        # Initialize the Ollama manager
 
+        # Initialize the Ollama manager
         manager = OllamaRequestManager(
             base_url="http://localhost:8000", ollama_params={"model": "llama2"}
         )
@@ -83,9 +83,10 @@ class StreamingReceiverTestUnit(unittest.TestCase):
                 break
             prompts.append(prompt)
 
+        batch_processor = BatchProcessor()
         # Process the prompts
-        manager.batch_requests(prompts, output_filename)
+        batch_processor.batch_generate(manager, prompts, output_filename)
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

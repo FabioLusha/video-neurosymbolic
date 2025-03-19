@@ -8,13 +8,8 @@ from ollama_manager import OllamaRequestManager, STARPromptGenerator
 
 SEED = 13471225022025
 
-MODELS = [
-    "llama3.2",
-    "llama3.1:8b",
-    "deepseek-r1:1.5b",
-    "deepseek-r1:7b"
-    "phi3:3.8b"
-]
+MODELS = ["llama3.2", "llama3.1:8b", "deepseek-r1:1.5b", "deepseek-r1:7b" "phi3:3.8b"]
+
 
 def load_open_qa_prompts():
     system_prompt = _load_prompt_fromfile("data/system_prompt.txt")
@@ -29,7 +24,7 @@ def load_mcq_prompts():
     mcq_system_prompt = _load_prompt_fromfile(
         "data/prompts/MCQ_system_prompt_v2_oneshot.txt"
     )
-    mcq_pformat = '''\
+    mcq_pformat = """\
         Q: {question}
         Alternatives:
         A. {c1}
@@ -39,7 +34,7 @@ def load_mcq_prompts():
 
         STSG: {stsg}
         A:
-        '''
+        """
     mcq_pformatter = pf.MCQPrompt(mcq_pformat)
 
     return mcq_system_prompt, mcq_pformatter
@@ -68,10 +63,10 @@ def load_mcq_html_prompts():
 def load_mcq_zs_cot_prompts():
     sys_prompt = _load_prompt_fromfile(
         "data/prompts/zero-shot-CoT/MCQ_system_prompt_ZS_CoT.txt"
-        )
+    )
     user_prompt = _load_prompt_fromfile(
         "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt"
-        )
+    )
 
     mcq_pformatter = pf.MCQPrompt(user_prompt)
 
@@ -149,7 +144,7 @@ def run_with_prompts(
 
     # Generate responses
     ollama.load_model()
-    ollama.batch_requests(prompts=prompts)
+    ollama.batch_generate(prompts=prompts)
 
 
 def main():
