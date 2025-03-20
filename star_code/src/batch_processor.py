@@ -1,9 +1,12 @@
-import traceback
-from datetime import datetime
 import json
 import os
+import traceback
+from datetime import datetime
+
 import requests
+
 from ollama_manager import Result
+
 
 class Pipeline:
 
@@ -23,121 +26,155 @@ class Pipeline:
 
         # some pipeline may produce only side-effects
         return result if result != [] else None
-    
 
-class BatchProcessor:
+def batch_request(payload_gen, ollama_client, endpoint, **kwargs):
+    consectuive_errors = 0
+    threshold = 10
 
-    def pipeline(self, data, *generators_f):
-        data_gen = (d for d in data)
-        
-        new_gen = data_gen
-        for apply_gen in generators_f:
-            new_gen = apply_gen(new_gen)
+    print(" Starting Response Generation ".center(80, "="))
+    for i, sample in enumerate(payload_gen, 1):
+        id = sample["qid"]
+        payload = sample["payload"]
 
-        for _ in new_gen:
-            pass
-
-        return True
-
-    def batch_request(self, payload_gen, ollama_client, endpoint, **kwargs):
-        consectuive_errors = 0
-        threshold = 10
-        
-        print(" Starting Response Generation ".center(80, "="))
-        for i, sample in enumerate(payload_gen, 1):
-            id = sample["qid"]
-            payload = sample["payload"]
-
-            try:
-                print(f"\nGenerating respone for iteration {i} - id: {id}")
-                response = ollama_client.ollama_completion_request(
-                    payload, endpoint, **kwargs
-                )
-
-                consectuive_errors = 0
-                yield Result("ok", ollama_client, id, payload, response)
-
-            except requests.RequestException as e:
-                # If an execption occurs return the exception object
-                # which also contains an attribute .response with the
-                # partial response
-                consectuive_errors += 1
-                if consectuive_errors > threshold:
-                    print(f"There have been more than {threshold} consecutive errors! Stopping the program!")
-                    raise ValueError(f"There have been {consectuive_errors} conscutive errors!")
-                
-                yield Result("error", ollama_client, id, payload, e)
-
-    def stream_save(self, response_generator, response_formatter, output_file_path=None):
-        start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
-
-        if output_file_path:
-            # Create directory if it doesn't exist
-            if os.path.exists(output_file_path):
-                raise FileExistsError(f"The file {output_file_path} already exists!")
-
-            # Create directory if it doesn't exists
-            dir = os.path.dirname(output_file_path)
-            output_dir = dir if dir != "" else "outputs"
-            os.makedirs(dir)
-
-        else:
-            # Create logs directory if it doesn't exist
-            output_dir = "outputs"
-            os.makedirs(output_dir, exist_ok=True)
-
-            # Saving the response as JSON in jsonl format,
-            # where each json object is saved in one line
-            output_file_path = os.path.join(
-                output_dir, f"responses_{start_timestamp}.jsonl"
+        try:
+            print(f"\nGenerating respone for iteration {i} - id: {id}")
+            response = ollama_client.ollama_completion_request(
+                payload, endpoint, **kwargs
             )
 
-        error_file = os.path.join(
-            output_dir, f"errors_{start_timestamp}.txt"
+            consectuive_errors = 0
+            yield Result("ok", ollama_client, id, payload, response)
+
+        except requests.RequestException as e:
+            # If an execption occurs return the exception object
+            # which also contains an attribute .response with the
+            # partial response
+            consectuive_errors += 1
+            if consectuive_errors > threshold:
+                print(f"There have been more than {threshold} consecutive errors! Stopping the program!")
+                raise ValueError(f"There have been {consectuive_errors} conscutive errors!")
+            
+            yield Result("error", ollama_client, id, payload, e)
+
+def stream_save(response_generator, response_formatter, output_file_path=None):
+    start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+
+    if output_file_path:
+        # Create directory if it doesn't exist
+        if os.path.exists(output_file_path):
+            raise FileExistsError(f"The file {output_file_path} already exists!")
+
+        # Create directory if it doesn't exists
+        dir = os.path.dirname(output_file_path)
+        output_dir = dir if dir != "" else "outputs"
+        os.makedirs(dir)
+
+    else:
+        # Create logs directory if it doesn't exist
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Saving the response as JSON in jsonl format,
+        # where each json object is saved in one line
+        output_file_path = os.path.join(
+            output_dir, f"responses_{start_timestamp}.jsonl"
         )
 
-        print(f"Responses will be saved to: {output_file_path}")
-        print(f"Errors will be logged to: {error_file}")
+    error_file = os.path.join(
+        output_dir, f"errors_{start_timestamp}.txt"
+    )
 
-        # Using line buffering
-        with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
+    print(f"Responses will be saved to: {output_file_path}")
+    print(f"Errors will be logged to: {error_file}")
 
-            for i, result in enumerate(response_generator, 1):
-                status = result.status
-                id = result.id
+    # Using line buffering
+    with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
 
-                if status == "ok":
-                    # Create response object
-                    response_obj = response_formatter.format_success_response(result)
+        for i, result in enumerate(response_generator, 1):
+            status = result.status
+            id = result.id
 
-                    res_f.write(json.dumps(response_obj) + "\n")
+            if status == "ok":
+                # Create response object
+                response_obj = response_formatter.format_success_response(result)
+
+                res_f.write(json.dumps(response_obj) + "\n")
+                res_f.flush()
+            elif status == "error":
+                with open(error_file, "a", buffering=1, encoding="utf-8") as error_f:
+                    log_msg, response_file_msg = response_formatter.format_error_response(result)
+
+                    error_f.write(
+                        json.dumps(log_msg, indent=2, ensure_ascii=False) + "\n"
+                    )
+                    error_f.flush()
+
+                    res_f.write(json.dumps(response_file_msg) + "\n")
                     res_f.flush()
-                elif status == "error":
-                    with open(error_file, "a", buffering=1, encoding="utf-8") as error_f:
-                        log_msg, response_file_msg = response_formatter.format_error_response(result)
 
-                        error_f.write(
-                            json.dumps(log_msg, indent=2, ensure_ascii=False) + "\n"
-                        )
-                        error_f.flush()
+                    print(
+                        f"Error at iteration {i}\n"
+                        f"Prompt id:{id}\n"
+                        "Look at the log file for specifics on the error"
+                    )
 
-                        res_f.write(json.dumps(response_file_msg) + "\n")
-                        res_f.flush()
+            yield result
 
-                        print(
-                            f"Error at iteration {i}\n"
-                            f"Prompt id:{id}\n"
-                            "Look at the log file for specifics on the error"
-                        )
+def batch_generate(ollama_client, prompts, output_file_path=None):
 
-                yield result
+    def payload_gen(prompts):
+        for p in prompts:
+            yield {
+                "qid": p["qid"],
+                "payload": {**ollama_client.ollama_params, "prompt":  p["prompt"]}
+            }
 
-    def batch_generate(self, ollama_client, prompts, output_file_path=None):
-        pipe = Pipeline(
-            lambda gen: self.batch_request(gen, ollama_client, endpoint="generate"),
-            lambda gen: self.stream_save(gen, GenerateResponseFormatter(), output_file_path)
-        )
-        return pipe.consume(prompts)
+
+    pipe = Pipeline(
+        lambda gen: batch_request(gen, ollama_client, endpoint="generate"),
+        lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path)
+    )
+    return pipe.consume(prompts)
+
+
+def auto_reply_gen(result_gen, ollama_client, reply):
+    for result in result_gen:
+        if result.status == 'ok':
+            messages = result.payload['messages']
+            messages.append(result.response)
+            messages.append({
+                "role": "user",
+                "content": reply
+            })
+
+            new_response = result.client.chat_completion(messages)
+
+            yield Result(result.status, result.client, result.id, messages, new_response)
+        else:
+            yield result
+
+
+def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=None):
+    def payload_gen(prompts):
+        for p in prompts:
+            yield {
+                "qid": p["qid"],
+                "payload": {
+                     **ollama_client.ollama_params,
+                     "messages": [{"role": "user", "content": p["prompt"]}]
+                 }
+            }
+
+    pipe = Pipeline(
+        # the first generator converts the prompt to the right format
+        lambda prompts: payload_gen(prompts),
+        lambda payload_gen: batch_request(payload_gen, ollama_client, 'chat'),
+        lambda resp_gen: auto_reply_gen(resp_gen, ollama_client, reply),
+        lambda resp_gen: stream_save(resp_gen, ChatResponseFormatter(), output_file_path)
+    )
+
+    return pipe.consume(prompts)
+
 
 class ResponseFormatter:
     def format_response(self, response_data):

@@ -1,9 +1,7 @@
 import json
 import logging
 import os
-import traceback
 from collections import namedtuple
-from datetime import datetime
 
 import requests
 

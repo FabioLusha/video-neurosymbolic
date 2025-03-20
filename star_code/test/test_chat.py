@@ -7,12 +7,12 @@ import time
 import unittest
 
 sys.path.append("../src")
-import prompt_formatters as pf  # noqa: E402
 
 # noqa: E402 - disables warning for this line
-from ollama_manager import AutoChat  # noqa: E402
-from ollama_manager import ChatServer, OllamaRequestManager, STARPromptGenerator
-
+from ollama_manager import OllamaRequestManager, STARPromptGenerator, Result
+from chat_utils import ChatServer
+import batch_processor
+import prompt_formatters as pf  # noqa: E402
 
 class TestChatService(unittest.TestCase):
 
@@ -24,7 +24,7 @@ class TestChatService(unittest.TestCase):
         # Wait for the server to start
         time.sleep(2)
 
-    def TearDown(self):
+    def tearDown(self):
         if self.server:
             self.server.terminate()  # Gracefully terminate the server
             self.server.wait()  # Wait for the process to exit
@@ -43,7 +43,33 @@ class TestChatService(unittest.TestCase):
 
         self.assertEqual(len(chat_server.chat_history), 2)
 
-    def test_auto_chat(self):
+    def test_auto_reply(self):
+        reply = "Automatic reply"
+
+        manager = OllamaRequestManager(
+                base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            )
+        
+        messages = [{"role": "user", "content": "First message"}]
+        payload = {**manager.ollama_params, "messages": messages}
+        resp = manager.chat_completion(messages)
+        result_form = Result("ok", manager, None, payload, resp)
+        
+        new_result = None
+        auto_rep_gen = batch_processor.auto_reply_gen(
+            (r for r in [result_form]), 
+            manager, 
+            reply)
+
+        for res in auto_rep_gen:
+            new_result = res
+        
+        self.assertEqual(len(new_result.payload), 3)
+        # The scaffold server repeats the message
+        self.assertTrue(new_result.response.get('content').strip().endswith(reply))
+
+
+    def test_batch_auto_chat(self):
         test_data = [
             {
                 "question_id": f"q{i}",
@@ -66,10 +92,9 @@ class TestChatService(unittest.TestCase):
                 base_url="http://localhost:8000", ollama_params={"model": "llama2"}
             )
 
-            automatic_chat = AutoChat(ollama_client=manager)
 
             # Create output directory
-            output_filename = "test_output2/out_resp.jsonl"
+            output_filename = "test_output_chat/out_resp.jsonl"
 
             # Get first 10 prompts
             prompts = []
@@ -78,22 +103,19 @@ class TestChatService(unittest.TestCase):
                     break
                 prompts.append(prompt)
 
-            def r_fun(response):
-                n_reply = 0
+            reply =  "This is an automatic reply"
+            batch_processor.batch_automatic_chat_reply(manager, prompts, reply, output_filename)
 
-                def next_f(response):
-                    nonlocal n_reply
-                    n_reply += 1
+            with open(output_filename, 'r') as out_f:
+                responses = [json.loads(line) for line in out_f.readlines()]
 
-                    if n_reply > 1:
-                        return None, None
-                    else:
-                        return "This is an automatic reply", next_f
+                for resp in responses:
+                    chat_history = resp['chat_history']
+                    
+                    self.assertEqual(len(chat_history), 4)
+                    # The scaffold server repeats the message
+                    self.assertTrue(chat_history[3]['content'].strip().endswith(reply))
 
-                return next_f(response)
-
-            # Process the prompts
-            automatic_chat.batch_chat(prompts, r_fun, output_filename)
 
 
 if __name__ == "__main__":

@@ -11,8 +11,7 @@ sys.path.append("../src")
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
 from ollama_manager import STARPromptGenerator
-import batch_processor as bp
-from batch_processor import BatchProcessor
+import batch_processor
 import prompt_formatters as pf
 
 class StreamingReceiverTestUnit(unittest.TestCase):
@@ -95,7 +94,6 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             for p in prompts)
         
          
-        batch_processor = BatchProcessor()
         for i in batch_processor.batch_request(payload_gen, manager, 'generate'):
             pass
 
@@ -105,42 +103,51 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             base_url="http://localhost:8000", ollama_params={"model": "llama2"}
         )
 
-        # Initialize the generator
-        generator = STARPromptGenerator(input_filename=self.temp_data_file.name)
+        test_data = [
+            {
+                "question_id": f"q{i}",
+                "question": f"Test question {i}",
+                "stsg": f"Test graph {i}",
+            }
+            for i in range(10)
+        ]
 
-        prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
-        pformatter = pf.OpenEndedPrompt(prompt_format)
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
+            json.dump(test_data, in_f)
+
+            in_f.seek(0)
+            generator = STARPromptGenerator(input_filename=in_f.name)
+
+            prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+            pformatter = pf.OpenEndedPrompt(prompt_format)
+            
+            # Get first 10 prompts
+            prompts = []
+            for i, prompt in enumerate(generator.generate(pformatter)):
+                if i >= 10:
+                    break
+                prompts.append(prompt)
+
+            payload_gen = (
+                {'qid': p['qid'], 'payload': {**manager.ollama_params, 'prompt': p['prompt']}}
+                for p in prompts)
 
 
-        
-        # Get first 10 prompts
-        prompts = []
-        for i, prompt in enumerate(generator.generate(pformatter)):
-            if i >= 10:
-                break
-            prompts.append(prompt)
+            payloads = list(payload_gen)
+            output_filename = "test_output/out_resp.jsonl"
 
-        payload_gen = (
-            {'qid': p['qid'], 'payload': {**manager.ollama_params, 'prompt': p['prompt']}}
-            for p in prompts)
-        
-        
-        batch_processor = BatchProcessor()
-        
-        payloads = list(payload_gen)
-        output_filename = "test_output/out_resp.jsonl"
-        
-        batch_processor.batch_generate(manager, payloads, output_filename)
+            batch_processor.batch_generate(manager, payloads, output_filename)
 
-        self.assertTrue(os.path.exists(output_filename))
+            self.assertTrue(os.path.exists(output_filename))
 
-        with open(output_filename, 'r') as out_f:
-            responses = [json.loads(line) for line in out_f.readlines()]
+            with open(output_filename, 'r') as out_f:
+                responses = [json.loads(line) for line in out_f.readlines()]
 
-            for resp in responses:
-                content = resp['response']
-                server_response = "Hi, I am alive "
-                self.assertEqual(content, server_response)
+                for resp in responses:
+                    content = resp['response']
+                    server_response = "Hi, I am alive "
+                    self.assertEqual(content, server_response)
+
 
 
 
