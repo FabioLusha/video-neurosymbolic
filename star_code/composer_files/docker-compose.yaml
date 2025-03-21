@@ -4,25 +4,26 @@ networks:
     name: lusha_network
 
 services:
-  ollama:
+  ollama_gemma:
     image: lusha/ollama
     environment:
+      - OLLAMA_HOST=0.0.0.0:11435
       - OLLAMA_LOG=debug
       - OLLAMA_DEBUG=1
     user: "${UID-1142}:${GID-1142}"
     ports:  
-      - "11434:11434"
+      - "11435:11435"
     volumes:
       - /home/lusha/storage/ollama/ollama_models:/.ollama 
-    container_name: lusha_ollama
+    container_name: lusha_ollama_gemma
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["5"]
+              device_ids: ["3", "4"]
               capabilities: [gpu]
-    cpuset: "12-15"
+    cpuset: "8-15"
     restart: "no"
     runtime: "nvidia"
     networks:
