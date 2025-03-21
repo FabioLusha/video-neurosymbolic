@@ -5,10 +5,17 @@ import os
 
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager, STARPromptGenerator
+import batch_processor
 
 SEED = 13471225022025
 
-MODELS = ["llama3.2", "llama3.1:8b", "deepseek-r1:1.5b", "deepseek-r1:7b" "phi3:3.8b"]
+MODELS = ["llama3.2", 
+          "llama3.1:8b", 
+          "deepseek-r1:1.5b", 
+          "deepseek-r1:7b",
+          "phi3:3.8b",
+          "gemma3:4b",
+          "gemma3:12b"]
 
 
 def load_open_qa_prompts():
@@ -65,7 +72,8 @@ def load_mcq_zs_cot_prompts():
         "data/prompts/zero-shot-CoT/MCQ_system_prompt_ZS_CoT.txt"
     )
     user_prompt = _load_prompt_fromfile(
-        "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt"
+        # "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt"
+        "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT_v2.txt"
     )
 
     mcq_pformatter = pf.MCQPrompt(user_prompt)
@@ -89,7 +97,7 @@ def load_llm_as_judge_prompts(responses_filepath):
     llm_judge_usr_prompt = _load_prompt_fromfile("data/prompts/LLM_judge_user_v2.txt")
 
     judge_pformatter = pf.LlmAsJudgePrompt(llm_judge_usr_prompt, responses_filepath)
-    return llm_judge_sys_prompt, llm_judge_usr_prompt
+    return llm_judge_sys_prompt, judge_pformatter
 
 
 def _load_prompt_fromfile(filename):
@@ -105,12 +113,14 @@ def run_with_prompts(
     system_prompt,
     prompt_formatter,
     model_name,
+    mode='generate',
     input_filepath=None,
     ids_filepath=None,
+    output_filepath=None
 ):
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    ollama = OllamaRequestManager(
+    ollama_client = OllamaRequestManager(
         base_url=OLLAMA_URL,
         ollama_params={
             "model": model_name,
@@ -119,7 +129,7 @@ def run_with_prompts(
             "options": {
                 "num_ctx": 10240,
                 "temperature": 0.1,
-                "num_predict": 8192,
+                "num_predict": 2048,
                 "seed": SEED,
             },
         },
@@ -143,8 +153,35 @@ def run_with_prompts(
     )
 
     # Generate responses
-    ollama.load_model()
-    ollama.batch_generate(prompts=prompts)
+    ollama_client.load_model()
+    if mode == 'generate':
+        print('=== Mode: generate')
+        batch_processor.batch_generate(
+            ollama_client,
+            prompts,
+            output_file_path=output_filepath
+        )
+
+    elif mode == 'chat':
+        print('=== Mode: chat')
+        reply = """\
+            Therefore the final answer is?
+            
+            Your response must be provided in valid JSON format as follows:
+            {"answer": "your complete answer here"}
+
+            IMPORTANT: Always include both the letter (A, B, C, D, etc.) AND the full text of the answer in your response.
+            Do not abbreviate or shorten the answer. For example, if the correct answer is "A. the laptop", your response 
+            should be {"answer": "A. the laptop"}, not {"answer": "laptop"} or {"answer": "A"}.\
+            """
+
+        batch_processor.batch_automatic_chat_reply(
+            ollama_client,
+            prompts,
+            reply,
+            output_file_path=output_filepath
+        )
+
 
 
 def main():
@@ -176,11 +213,19 @@ def main():
         "--input-file", help="Input dataset file path (defaults based on prompt type)"
     )
     parser.add_argument(
+        "--output-file", help="file path where to save the response)"
+    )
+    parser.add_argument(
         "--ids-file",
         help="File were to extract ids for which to run the model",
     )
     parser.add_argument(
         "--responses-file", help="File with the responses to be evaluated by the judge"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=['generate', 'chat'],
+        help="How to run the model, 'chat' or 'generate' mode"
     )
 
     args = parser.parse_args()
@@ -209,7 +254,9 @@ def main():
         system_prompt=system_prompt,
         prompt_formatter=prompt_formatter,
         model_name=args.model,
+        mode=args.mode,
         input_filepath=input_file,
+        output_filepath=args.output_file,
         ids_filepath=ids_file_path,
     )
 

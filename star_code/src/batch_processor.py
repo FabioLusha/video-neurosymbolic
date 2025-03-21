@@ -67,7 +67,7 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
         # Create directory if it doesn't exists
         dir = os.path.dirname(output_file_path)
         output_dir = dir if dir != "" else "outputs"
-        os.makedirs(dir)
+        os.makedirs(dir, exist_ok=True)
 
     else:
         # Create logs directory if it doesn't exist
@@ -131,13 +131,14 @@ def batch_generate(ollama_client, prompts, output_file_path=None):
 
 
     pipe = Pipeline(
+        payload_gen,
         lambda gen: batch_request(gen, ollama_client, endpoint="generate"),
         lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path)
     )
     return pipe.consume(prompts)
 
 
-def auto_reply_gen(result_gen, ollama_client, reply):
+def auto_reply_gen(result_gen, reply):
     for result in result_gen:
         if result.status == 'ok':
             messages = result.payload['messages']
@@ -169,7 +170,7 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
         # the first generator converts the prompt to the right format
         lambda prompts: payload_gen(prompts),
         lambda payload_gen: batch_request(payload_gen, ollama_client, 'chat'),
-        lambda resp_gen: auto_reply_gen(resp_gen, ollama_client, reply),
+        lambda resp_gen: auto_reply_gen(resp_gen, reply),
         lambda resp_gen: stream_save(resp_gen, ChatResponseFormatter(), output_file_path)
     )
 
