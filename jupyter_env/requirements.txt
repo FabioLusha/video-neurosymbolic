@@ -7,10 +7,15 @@ jupyterlab
 numpy
 pandas
 scikit-learn=1.6.1
-scikit-image
 scipy
+
+# image processing
+opencv-python=4.11
+scikit-image
+
 # Interactive Widgets & Extensions
 ipywidgets
+ipyplot
 jupyter_contrib_nbextensions
 jupyter_nbextensions_configurator
 ipykernel
@@ -25,7 +30,6 @@ jupyter
 # plotting
 matplotlib
 seaborn
-
 
 fastapi
 uvicorn

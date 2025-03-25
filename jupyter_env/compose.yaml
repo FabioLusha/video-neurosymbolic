@@ -16,6 +16,7 @@ services:
       - /home/lusha/storage:/home/lusha
       - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
       - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
     deploy:
       resources:
         reservations:
