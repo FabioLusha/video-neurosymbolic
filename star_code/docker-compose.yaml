@@ -6,39 +6,7 @@ networks:
     external: true
 
 services:
-  req_manager_gemma12b:
-    environment:
-      - OLLAMA_URL=http://lusha_ollama_gemma:11435
-      - PYTHONUNBUFFERED=1
-    stdin_open: true  # Keep stdin open
-    tty: true        # Allocate a pseudo-TTY
-    image: lusha/star_req_manager
-    entrypoint: ['python']
-    command: [
-      '-u', 
-      'src/main.py', 
-      '--model', 'gemma3:12b', 
-      '--prompt-type', 'mcq_zs_cot', 
-      '--mode', 'chat',
-      '--output-file', 'outputs/responses_gemma3_12b_20250321:15:20.jsonl']
-    container_name: lusha_req_manager_gemma12b
-    user: "${UID-1142}:${GID-1142}"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 0
-    volumes:
-      - /home/lusha/storage/star_code/outputs:/app/outputs
-      - /home/lusha/storage/star_code/data:/app/data
-      - /home/lusha/datasets/private:/app/data/datasets
-      - /home/lusha/storage/star_code/src:/app/src
-    cpuset: "12-15"
-    networks:
-      - default
-
-  req_manager_gemma4b:
+  req_manager_llama8b:
     environment:
       - OLLAMA_URL=http://lusha_ollama_gemma:11435
       - PYTHONUNBUFFERED=1
@@ -52,8 +20,8 @@ services:
       '--model', 'gemma3:4b', 
       '--prompt-type', 'mcq_zs_cot', 
       '--mode', 'chat',
-      '--output-file', 'outputs/responses_gemma3_4b_20250321:15:20.jsonl']
-    container_name: lusha_req_manager_gemma4b
+      '--output-file', 'outputs/responses_gemma3:4b_20250323_20:38:00.jsonl']
+    container_name: lusha_req_manager_llama8b
     user: "${UID-1142}:${GID-1142}"
     deploy:
       resources:
