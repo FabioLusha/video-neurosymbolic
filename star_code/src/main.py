@@ -164,16 +164,17 @@ def run_with_prompts(
 
     elif mode == 'chat':
         print('=== Mode: chat')
-        reply = """\
-            Therefore the final answer is?
-            
-            Your response must be provided in valid JSON format as follows:
-            {"answer": "your complete answer here"}
-
-            IMPORTANT: Always include both the letter (A, B, C, D, etc.) AND the full text of the answer in your response.
-            Do not abbreviate or shorten the answer. For example, if the correct answer is "A. the laptop", your response 
-            should be {"answer": "A. the laptop"}, not {"answer": "laptop"} or {"answer": "A"}.\
-            """
+        reply = \
+        """\
+        Therefore the final answer is?
+        
+        Your response must be provided in valid JSON format as follows:
+        {"answer": "your complete answer here"}
+        
+        IMPORTANT: Always include both the letter (A, B, C, D, etc.) AND the full text of the answer in your response.
+        Do not abbreviate or shorten the answer. For example, if the correct answer is "A. the laptop", your response 
+        should be {"answer": "A. the laptop"}, not {"answer": "laptop"} or {"answer": "A"}.\
+        """
 
         batch_processor.batch_automatic_chat_reply(
             ollama_client,
