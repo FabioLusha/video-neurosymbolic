@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import ipyplot
 import matplotlib.pyplot as plt
+import pathlib
 
 def sample_frames(frame_ids, max_show_num):
     # sample frames from given frame IDs averagely according to max_show_num
@@ -21,7 +22,7 @@ def trim_keyframes(data,fps,max_show_num=4):
 def frame_plot(frame_list,frame_dir):
     select = []
     for i in range(len(frame_list)):
-        frame = cv2.imread(frame_dir+'/'+frame_list[i]+'.png')
+        frame = cv2.imread(frame_dir / frame_list[i] / '.png')
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         select.append(frame)
     ipyplot.plot_images(select,max_images=len(select),img_width=150)
@@ -124,13 +125,13 @@ def get_vocab(label_dir):
     obj_to_ind, ind_to_obj, ind_to_rel, rel_to_ind = {}, {}, {}, {}
     obj_vocab, rel_vocab =[], []
 
-    with open(label_dir + "/object_classes.txt") as f:
+    with open(label_dir / "object_classes.txt") as f:
         lines = f.readlines()
         for line in lines:
             mapping = line.strip('\n')
             obj_vocab.append(mapping.split(' ')[1])
 
-    with open(label_dir + "/relationship_classes.txt") as f:
+    with open(label_dir / "relationship_classes.txt") as f:
         lines = f.readlines()
         for line in lines:
             mapping = line.strip('\n')
@@ -142,7 +143,7 @@ def get_vocab(label_dir):
 def get_act_cls(label_dir):
 
     dict = {}
-    with open(label_dir + "/action_classes.txt") as f:
+    with open(label_dir / "action_classes.txt") as f:
         lines = f.readlines()
         for line in lines:
             tag = line[0:4]

@@ -19,8 +19,17 @@ from matplotlib import cm
 from .vis_utils import *
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-obj_vocab, rel_vocab = get_vocab('../annotations/STAR_classes')
-act_cls = get_act_cls('../annotations/STAR_classes')
+
+from pathlib import Path
+
+# Get the directory where a.py is located
+BASE_DIR = Path(__file__).parent.parent  
+# / is a overload operator for paths
+ANNOTATIONS_PATH = BASE_DIR / 'annotations'
+
+    
+obj_vocab, rel_vocab = get_vocab(ANNOTATIONS_PATH / 'STAR_classes')
+act_cls = get_act_cls(ANNOTATIONS_PATH / 'STAR_classes')
 
 def Vis_Meta_Info(data):
     print('QID:', data['question_id'], ', VID: ', data['video_id']) 
