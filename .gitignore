@@ -1,3 +1,8 @@
+# Ignore ALL dotfiles/dotdirs (starting with .)
+.*
+# Except .gitignore and .git/
+!.gitignore
+!.git/
 ActionGenome
 ollama/ollama_models
 ollama/logs
