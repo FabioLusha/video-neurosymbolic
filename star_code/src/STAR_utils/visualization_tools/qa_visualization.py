@@ -49,20 +49,21 @@ def Vis_Video(data,raw_video_dir,save_video_dir):
     end = round(data['end'], 2) # end time
     video_id = data['video_id']
 
-    in_path = raw_video_dir + video_id + '.mp4'
-    out_path = save_video_dir + data['question_id'] + '.mp4'
+    in_path = raw_video_dir / f"{video_id}.mp4"
+    out_path = save_video_dir / f"{data['question_id']}.mp4"
     print('\tVideo Seg: ', str(start) + 's', '-', str(end) + 's')
     os.system('ffmpeg -y -ss %s -to %s -i %s -codec copy %s' % (str(start), str(end), in_path, out_path))
     IPython.display.display( Video(out_path, embed=True, height=300, html_attributes="controls muted autoplay"))
 
 def Vis_Keyframes(data,fps,max_show_num,raw_frame_dir):
 
-    all_frame_dir = raw_frame_dir +'/' +data['video_id']+'.mp4'
+    all_frame_dir = raw_frame_dir / f"{data['video_id']}.mp4"
     trimmed_frame_ids = trim_keyframes(data,fps,max_show_num)
-    frame_plot(trimmed_frame_ids,all_frame_dir)
+    frames = frame_plot(trimmed_frame_ids,all_frame_dir)
+    return frames
 
 def Vis_Box(data,fps,max_show_num,raw_frame_dir):
-    all_frame_dir = raw_frame_dir +'/' +data['video_id']+'.mp4'
+    all_frame_dir = raw_frame_dir / f"{data['video_id']}.mp4"
     trimmed_frame_ids = trim_keyframes(data,fps,max_show_num)
     select = []
     for id in trimmed_frame_ids:
@@ -72,7 +73,7 @@ def Vis_Box(data,fps,max_show_num,raw_frame_dir):
         colors = [cmap(i) for i in np.linspace(0, 1, len(bbox_list) + 2)]
         colors = [(c[2] * 255, c[1] * 255, c[0] * 255) for c in colors]
         color_ctlr=0
-        frame = cv2.imread(all_frame_dir+'/'+id+'.png')
+        frame = cv2.imread(all_frame_dir / f"{id}.png")
 
         for i,bbox in enumerate(bbox_list):
             if bbox is not None:
@@ -89,18 +90,18 @@ def Vis_Box(data,fps,max_show_num,raw_frame_dir):
 
 def Vis_Pose(data,fps,max_show_num,raw_frame_dir,pose_dir):
 
-    all_frame_dir = raw_frame_dir +'/' +data['video_id']+'.mp4'
+    all_frame_dir = raw_frame_dir / f"{data['video_id']}.mp4"
     trimmed_frame_ids = trim_keyframes(data,fps,max_show_num)
     select = []
 
     for id in trimmed_frame_ids:
-        pose_file = pose_dir + data['video_id'] + '/' + id + '.json'
+        pose_file = pose_dir + data['video_id'] / f"{id}.json"
         try:
             pose = json.load(open(pose_file))['people'][0]['pose_keypoints_2d']
-            frame = cv2.imread(all_frame_dir+'/'+id+'.png')
+            frame = cv2.imread(all_frame_dir / f"{id}.png")
             frame = vis_keypoints(frame,pose)
         except:
-            frame = cv2.imread(all_frame_dir+'/'+id+'.png')
+            frame = cv2.imread(all_frame_dir / f"{id}.png")
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         select.append(frame)

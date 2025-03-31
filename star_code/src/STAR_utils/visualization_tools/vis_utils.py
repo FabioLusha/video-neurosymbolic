@@ -15,17 +15,21 @@ def sample_frames(frame_ids, max_show_num):
 
 def trim_keyframes(data,fps,max_show_num=4):
     frame_ids = list(sorted(data['situations'].keys()))
-    trimmed_frame_ids = [frame for frame in frame_ids if int(frame)>=(data['start'])*fps[data['video_id']+'.mp4']+1 and int(frame)<(data['end'])*fps[data['video_id']+'.mp4']+1]
+    trimmed_frame_ids = [
+        frame for frame in frame_ids 
+        if int(frame) >= (data['start'])*fps[data['video_id']+'.mp4']+1 \
+            and int(frame)<(data['end'])*fps[data['video_id']+'.mp4']+1]
     trimmed_frame_ids = sample_frames(trimmed_frame_ids,max_show_num)
     return trimmed_frame_ids
 
 def frame_plot(frame_list,frame_dir):
     select = []
     for i in range(len(frame_list)):
-        frame = cv2.imread(frame_dir / frame_list[i] / '.png')
+        frame = cv2.imread(frame_dir / f"{frame_list[i]}.png")
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         select.append(frame)
     ipyplot.plot_images(select,max_images=len(select),img_width=150)
+    return select
 
 def vis_keypoints(img,kpts):
 
