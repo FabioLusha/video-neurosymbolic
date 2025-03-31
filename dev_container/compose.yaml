@@ -6,6 +6,8 @@ services:
   env_container:
     image: lusha/pydev
     container_name: lusha_pydev_env
+    env_file:
+      - .env
     user: "1142:1142"
     stdin_open: true  # same as -i
     tty: true         # same as -t
@@ -16,6 +18,7 @@ services:
       - /home/lusha/storage:/home/lusha
       - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
       - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
       - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
     deploy:
       resources:

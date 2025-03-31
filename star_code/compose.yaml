@@ -8,7 +8,7 @@ networks:
 services:
   req_manager_llama8b:
     environment:
-      - OLLAMA_URL=http://lusha_ollama_gemma:11435
+      - OLLAMA_URL=http://lusha_ollama:11435
       - PYTHONUNBUFFERED=1
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
