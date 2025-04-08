@@ -1,19 +1,30 @@
 import json
-import numpy as np
+import pathlib
+from math import ceil
+
 import cv2
 import ipyplot
 import matplotlib.pyplot as plt
-import pathlib
+import numpy as np
+
 
 def sample_frames(frame_ids, max_show_num):
     # sample frames from given frame IDs averagely according to max_show_num
-    if max_show_num==0:
+    if max_show_num == 0:
         return frame_ids
     max_show_num = min(len(frame_ids), max_show_num)
-    interval = int(len(frame_ids)/max_show_num)
+    interval = ceil(len(frame_ids) / max_show_num)
     return frame_ids[::interval]
 
-def trim_keyframes(data,fps,max_show_num=4):
+def trim_keyframes(data, fps, max_show_num=4):
+    # fps should be a dictionary containing the fps rate of the video
+    # It is needed for this fucntion to convert the start time to frame
+    # ids.
+    # However, this function might be not needed because the data of each
+    # situation contains the infomration about the frames present in the 
+    # situation event, therfore we can use the function sample_frames by passing
+    # sample['situations'].keys() as input list
+
     frame_ids = list(sorted(data['situations'].keys()))
     trimmed_frame_ids = [
         frame for frame in frame_ids 
