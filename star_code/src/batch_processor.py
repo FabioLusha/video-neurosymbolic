@@ -27,8 +27,8 @@ class Pipeline:
         # some pipeline may produce only side-effects
         return result if result != [] else None
 
-def batch_request(payload_gen, ollama_client, endpoint, **kwargs):
-    consectuive_errors = 0
+def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
+    consecutive_errors = 0
     threshold = 10
 
     print(" Starting Response Generation ".center(80, "="))
@@ -37,22 +37,22 @@ def batch_request(payload_gen, ollama_client, endpoint, **kwargs):
         payload = sample["payload"]
 
         try:
-            print(f"\nGenerating respone for iteration {i} - id: {id}")
+            print(f"\nGenerating response for iteration {i} - id: {id}")
             response = ollama_client.ollama_completion_request(
                 payload, endpoint, **kwargs
             )
 
-            consectuive_errors = 0
+            consecutive_errors = 0
             yield Result("ok", ollama_client, id, payload, response)
 
         except requests.RequestException as e:
-            # If an execption occurs return the exception object
+            # If an exception occurs return the exception object
             # which also contains an attribute .response with the
             # partial response
-            consectuive_errors += 1
-            if consectuive_errors > threshold:
+            consecutive_errors += 1
+            if consecutive_errors > threshold:
                 print(f"There have been more than {threshold} consecutive errors! Stopping the program!")
-                raise ValueError(f"There have been {consectuive_errors} conscutive errors!")
+                raise ValueError(f"There have been {consecutive_errors} consecutive errors!")
             
             yield Result("error", ollama_client, id, payload, e)
 
@@ -132,7 +132,7 @@ def batch_generate(ollama_client, prompts, output_file_path=None):
 
     pipe = Pipeline(
         payload_gen,
-        lambda gen: batch_request(gen, ollama_client, endpoint="generate"),
+        lambda gen: stream_request(gen, ollama_client, endpoint="generate"),
         lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path)
     )
     return pipe.consume(prompts)
@@ -169,7 +169,7 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
     pipe = Pipeline(
         # the first generator converts the prompt to the right format
         lambda prompts: payload_gen(prompts),
-        lambda payload_gen: batch_request(payload_gen, ollama_client, 'chat'),
+        lambda payload_gen: stream_request(payload_gen, ollama_client, 'chat'),
         lambda resp_gen: auto_reply_gen(resp_gen, reply),
         lambda resp_gen: stream_save(resp_gen, ChatResponseFormatter(), output_file_path)
     )

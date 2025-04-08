@@ -18,11 +18,11 @@ def sample_frames(frame_ids, max_show_num):
 
 def trim_keyframes(data, fps, max_show_num=4):
     # fps should be a dictionary containing the fps rate of the video
-    # It is needed for this fucntion to convert the start time to frame
+    # It is needed for this function to convert the start time to frame
     # ids.
     # However, this function might be not needed because the data of each
-    # situation contains the infomration about the frames present in the 
-    # situation event, therfore we can use the function sample_frames by passing
+    # situation contains the information about the frames present in the 
+    # situation event, therefore we can use the function sample_frames by passing
     # sample['situations'].keys() as input list
 
     frame_ids = list(sorted(data['situations'].keys()))
@@ -40,7 +40,7 @@ def frame_plot(frame_list,frame_dir):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         select.append(frame)
     ipyplot.plot_images(select,max_images=len(select),img_width=150)
-    return select
+    return
 
 def vis_keypoints(img,kpts):
 

@@ -2,11 +2,11 @@ version: '3'
 
 networks:
   default:
-    name: lusha_network
+    name: lusha_net
     external: true
 
 services:
-  req_manager_llama8b:
+  req_manager:
     environment:
       - OLLAMA_URL=http://lusha_ollama:11435
       - PYTHONUNBUFFERED=1
@@ -17,11 +17,11 @@ services:
     command: [
       '-u', 
       'src/main.py', 
-      '--model', 'gemma3:4b', 
+      '--model', 'deepseek-r1:7b', 
       '--prompt-type', 'mcq_zs_cot', 
       '--mode', 'chat',
-      '--output-file', 'outputs/responses_gemma3:4b_20250323_20:38:00.jsonl']
-    container_name: lusha_req_manager_llama8b
+      '--output-file', 'outputs/responses_deepseek-r1:7b_20250404_10:41:00.jsonl']
+    container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
     deploy:
       resources:
@@ -34,6 +34,6 @@ services:
       - /home/lusha/storage/star_code/data:/app/data
       - /home/lusha/datasets/private:/app/data/datasets
       - /home/lusha/storage/star_code/src:/app/src
-    cpuset: "12-15"
+    cpuset: "36-39"
     networks:
       - default

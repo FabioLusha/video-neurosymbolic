@@ -2,6 +2,7 @@ import argparse
 import functools
 import json
 import os
+import pathlib
 
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager, STARPromptGenerator
@@ -69,11 +70,11 @@ def load_mcq_html_prompts():
 
 def load_mcq_zs_cot_prompts():
     sys_prompt = _load_prompt_fromfile(
-        "data/prompts/zero-shot-CoT/MCQ_system_prompt_ZS_CoT.txt"
+        "data/prompts/zero-shot-cot/MCQ_system_prompt_ZS_CoT.txt"
     )
     user_prompt = _load_prompt_fromfile(
-        # "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT.txt"
-        "data/prompts/zero-shot-CoT/MCQ_user_prompt_ZS_CoT_v2.txt"
+        # "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT.txt"
+        "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt"
     )
 
     mcq_pformatter = pf.MCQPrompt(user_prompt)
@@ -261,6 +262,12 @@ def main():
         ids_filepath=ids_file_path,
     )
 
+def generate_frames():
+    star_data = []
+    with open("../data/datasets/STAR/STAR_annotations/STAR_val.json") as in_file:
+        star_data = json.load(in_file)
+        
+    
 
 if __name__ == "__main__":
     main()

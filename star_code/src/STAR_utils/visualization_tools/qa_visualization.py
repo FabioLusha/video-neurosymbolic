@@ -59,8 +59,7 @@ def Vis_Keyframes(data,fps,max_show_num,raw_frame_dir):
 
     all_frame_dir = raw_frame_dir / f"{data['video_id']}.mp4"
     trimmed_frame_ids = trim_keyframes(data,fps,max_show_num)
-    frames = frame_plot(trimmed_frame_ids,all_frame_dir)
-    return frames
+    frame_plot(trimmed_frame_ids,all_frame_dir)
 
 def Vis_Box(data,fps,max_show_num,raw_frame_dir):
     all_frame_dir = raw_frame_dir / f"{data['video_id']}.mp4"
