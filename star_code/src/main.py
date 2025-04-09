@@ -5,7 +5,7 @@ import json
 import os
 import pathlib
 
-import cv2
+import re
 
 import batch_processor
 import prompt_formatters as pf
@@ -275,7 +275,7 @@ def generate_frames(max_sample=10):
         frame_ids
 
         frame_dir = raw_frame_dir / f"{sample['video_id']}.mp4"
-        b64_encodings = dict()
+        b64_encodings = []
         for f_id in frame_ids:
             with open(frame_dir / f"{f_id}.png", "rb") as f:
                 img_bytes = f.read()
@@ -291,12 +291,17 @@ def generate_frames(max_sample=10):
                 for encoding in b64_encodings
             ]
 
+def extract_frame_description(text):
+    pattern = "(?<=<scene_graph>)(?s:.+)(?=</scene_graph)"
+    match = re.search(pattern, text)
+
+    return match.group(0) if match else ""
+
 
 def streaming_frame_generation(ollama_client, frames, output_file):
-    star_data = []
 
-    def payload_gen(frame_gen):
-        for frame in frame_gen:
+    def payload_gen(frames):
+        for frame in frames:
             req_obj = {
                 "qid": frame["question_id"],
                 "frame_id": frame["frame_id"],
@@ -311,6 +316,28 @@ def streaming_frame_generation(ollama_client, frames, output_file):
                     ],
                 },
             }
+
+            yield req_obj
+
+    def frame_aggregator(stream):
+        for obj in stream:
+            obj['id']
+
+    frames = generate_frames(max_sample=10)
+    bp = batch_processor
+    graph_gen_pipeline = bp.Pipeline(
+        payload_gen,
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, 'chat'),
+        lambda resp_gen: bp.auto_reply_gen(resp_gen, prompt2),
+        lambda resp_gen: ({**stream_obj, 'stsg': extract_frame_description(stream_obj['response'])} for stream_obj in resp_gen)
+        # ===============
+        # aggregate frames
+        lambda resp_gen:
+        lambda resp_gen: bp.stream_save(
+            resp_gen, ChatResponseFormatter(), output_file_path
+        ),
+
+    )
 
 
 if __name__ == "__main__":
