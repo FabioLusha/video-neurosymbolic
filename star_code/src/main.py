@@ -4,6 +4,8 @@ import json
 import os
 import pathlib
 
+import cv2
+
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager, STARPromptGenerator
 import batch_processor
@@ -262,12 +264,69 @@ def main():
         ids_filepath=ids_file_path,
     )
 
-def generate_frames():
+def generate_frames(max_sample=10):
+    from STAR_utils.visualization_tools import vis_utils
+    
+    def load_frames(frame_list, frame_dir):
+        select = []
+        for i in range(len(frame_list)):
+            frame = cv2.imread(frame_dir / f"{frame_list[i]}.png")
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            select.append(frame)
+
+        return select
+
     star_data = []
     with open("../data/datasets/STAR/STAR_annotations/STAR_val.json") as in_file:
         star_data = json.load(in_file)
         
+    raw_frame_dir = pathlib.Path('../data/datasets/action-genome/frames/')
     
+    for sample in star_data:
+        frame_ids = vis_utils.sample_frames(list(sample['situations'].keys()), max_sample)
+        frame_ids
+        
+        frame_dir = raw_frame_dir / f"{sample['video_id']}.mp4"
+        frames = load_frames(frame_ids, frame_dir)
+        
+        yield sample['question_id'], frames
 
+def streaming_frame_generation(ollama_client, frames, output_file):
+    def
+    
 if __name__ == "__main__":
     main()
+
+prompt1 = """\
+    Look carefully at this image and identify all objects and relationships present.
+
+    First, list all distinct objects you can detect in the image. Be thorough and specific with your object labels (e.g., "young woman" rather than just "person", "wooden chair" rather than just "chair").
+
+    Then, describe the key relationships between these objects in free-form text. Consider:
+    - Spatial relationships (above, below, behind, inside, etc.)
+    - Action-based relationships (holding, looking at, sitting on, etc.)
+    - Physical connections (attached to, part of, touching, etc.)
+    - Relative positions (next to, between, surrounding, etc.)
+
+    Think step by step.\
+"""
+
+prompt2 = """\
+    Thank you. Now organize the objects and relationships you identified into a formal scene graph using this format:
+    object1 ---- relationship ---- object2
+    
+    The list of relationship predicates should be introduced by the tag <scene_graph> and terminated by the tag </scene_graph>
+    For example:
+    woman ---- sitting_on ---- chair
+    dog ---- lying_under ---- table
+    book ---- on_top_of ---- shelf
+
+    Please follow these guidelines:
+    1. Create at least 10 relationship triplets (more if the image is complex)
+    2. Use specific and consistent object labels
+    3. Use concise but descriptive relationship terms (connect words with underscores)
+    4. Include all meaningful relationships between objects
+    5. Verify that all objects you identified in step 1 appear in at least one relationship
+
+    Your scene graph:\
+    """

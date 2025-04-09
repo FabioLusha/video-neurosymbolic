@@ -180,8 +180,8 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
                 "qid": p["qid"],
                 "payload": {
                     **ollama_client.ollama_params,
-                    "messages": [{"role": "user", "content": p["prompt"]}],
-                },
+                    "messages": [{"role": "user", "content": p["prompt"]}]
+                }
             }
 
     pipe = Pipeline(
