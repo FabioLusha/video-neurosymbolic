@@ -1,4 +1,5 @@
 import argparse
+import base64
 import functools
 import json
 import os
@@ -6,19 +7,21 @@ import pathlib
 
 import cv2
 
+import batch_processor
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager, STARPromptGenerator
-import batch_processor
 
 SEED = 13471225022025
 
-MODELS = ["llama3.2", 
-          "llama3.1:8b", 
-          "deepseek-r1:1.5b", 
-          "deepseek-r1:7b",
-          "phi3:3.8b",
-          "gemma3:4b",
-          "gemma3:12b"]
+MODELS = [
+    "llama3.2",
+    "llama3.1:8b",
+    "deepseek-r1:1.5b",
+    "deepseek-r1:7b",
+    "phi3:3.8b",
+    "gemma3:4b",
+    "gemma3:12b",
+]
 
 
 def load_open_qa_prompts():
@@ -116,10 +119,10 @@ def run_with_prompts(
     system_prompt,
     prompt_formatter,
     model_name,
-    mode='generate',
+    mode="generate",
     input_filepath=None,
     ids_filepath=None,
-    output_filepath=None
+    output_filepath=None,
 ):
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -157,18 +160,15 @@ def run_with_prompts(
 
     # Generate responses
     ollama_client.load_model()
-    if mode == 'generate':
-        print('=== Mode: generate')
+    if mode == "generate":
+        print("=== Mode: generate")
         batch_processor.batch_generate(
-            ollama_client,
-            prompts,
-            output_file_path=output_filepath
+            ollama_client, prompts, output_file_path=output_filepath
         )
 
-    elif mode == 'chat':
-        print('=== Mode: chat')
-        reply = \
-        """\
+    elif mode == "chat":
+        print("=== Mode: chat")
+        reply = """\
         Therefore the final answer is?
         
         Your response must be provided in valid JSON format as follows:
@@ -180,12 +180,8 @@ def run_with_prompts(
         """
 
         batch_processor.batch_automatic_chat_reply(
-            ollama_client,
-            prompts,
-            reply,
-            output_file_path=output_filepath
+            ollama_client, prompts, reply, output_file_path=output_filepath
         )
-
 
 
 def main():
@@ -216,9 +212,7 @@ def main():
     parser.add_argument(
         "--input-file", help="Input dataset file path (defaults based on prompt type)"
     )
-    parser.add_argument(
-        "--output-file", help="file path where to save the response)"
-    )
+    parser.add_argument("--output-file", help="file path where to save the response)")
     parser.add_argument(
         "--ids-file",
         help="File were to extract ids for which to run the model",
@@ -228,8 +222,8 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=['generate', 'chat'],
-        help="How to run the model, 'chat' or 'generate' mode"
+        choices=["generate", "chat"],
+        help="How to run the model, 'chat' or 'generate' mode",
     )
 
     args = parser.parse_args()
@@ -264,36 +258,61 @@ def main():
         ids_filepath=ids_file_path,
     )
 
+
 def generate_frames(max_sample=10):
     from STAR_utils.visualization_tools import vis_utils
-    
-    def load_frames(frame_list, frame_dir):
-        select = []
-        for i in range(len(frame_list)):
-            frame = cv2.imread(frame_dir / f"{frame_list[i]}.png")
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            select.append(frame)
-
-        return select
 
     star_data = []
     with open("../data/datasets/STAR/STAR_annotations/STAR_val.json") as in_file:
         star_data = json.load(in_file)
-        
-    raw_frame_dir = pathlib.Path('../data/datasets/action-genome/frames/')
-    
+
+    raw_frame_dir = pathlib.Path("../data/datasets/action-genome/frames/")
+
     for sample in star_data:
-        frame_ids = vis_utils.sample_frames(list(sample['situations'].keys()), max_sample)
+        frame_ids = vis_utils.sample_frames(
+            list(sample["situations"].keys()), max_sample
+        )
         frame_ids
-        
+
         frame_dir = raw_frame_dir / f"{sample['video_id']}.mp4"
-        frames = load_frames(frame_ids, frame_dir)
-        
-        yield sample['question_id'], frames
+        b64_encodings = dict()
+        for f_id in frame_ids:
+            with open(frame_dir / f"{f_id}.png", "rb") as f:
+                img_bytes = f.read()
+                b64_encodings.append(
+                    {
+                        "frame_id": f_id,
+                        "encoding": base64.b64encode(img_bytes).decode("utf-8"),
+                    }
+                )
+
+            yield [
+                {"question_id": sample["question_id"], **encoding}
+                for encoding in b64_encodings
+            ]
+
 
 def streaming_frame_generation(ollama_client, frames, output_file):
-    def
-    
+    star_data = []
+
+    def payload_gen(frame_gen):
+        for frame in frame_gen:
+            req_obj = {
+                "qid": frame["question_id"],
+                "frame_id": frame["frame_id"],
+                "payload": {
+                    **ollama_client.ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt1,
+                            "images": [frame["encoding"]],
+                        }
+                    ],
+                },
+            }
+
+
 if __name__ == "__main__":
     main()
 
