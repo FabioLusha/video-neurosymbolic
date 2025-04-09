@@ -4,6 +4,7 @@ import traceback
 from datetime import datetime
 
 import requests
+
 from ollama_manager import Result
 
 
@@ -42,13 +43,12 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
             )
 
             consectuive_errors = 0
-            # yield {**sample, "status": "ok", "id": id, "client": ollama_client, "response": response}
             yield {
-                "status": "ok",
-                "client": ollama_client,
-                "id": id,
-                "payload": payload,
-                "response": response,
+                **sample, 
+                "status": "ok", 
+                "id": id, 
+                "client": ollama_client, 
+                "response": response
             }
 
         except requests.RequestException as e:
@@ -64,11 +64,11 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                     f"There have been {consectuive_errors} conscutive errors!"
                 )
             yield {
-                "status": "error",
-                "client": ollama_client,
-                "id": id,
-                "payload": payload,
-                "response": e,
+                **sample, 
+                "status": "error", 
+                "id": id, 
+                "client": ollama_client, 
+                "response": e
             }
 
 def stream_save(response_generator, response_formatter, output_file_path=None):
@@ -162,16 +162,10 @@ def auto_reply_gen(result_gen, reply):
 
             new_response = result["client"].chat_completion(messages)
 
-            yield {
-                "status": result["status"],
-                "client": result["client"],
-                "id": result["id"],
-                "payload": messages,
-                "response": new_response,
-            }
-        else:
-            yield result
+            result['payload'] = messages
+            result['response'] = new_response
 
+        yield result
 
 def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=None):
     def payload_gen(prompts):
