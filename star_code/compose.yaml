@@ -34,6 +34,6 @@ services:
       - /home/lusha/storage/star_code/data:/app/data
       - /home/lusha/datasets/private:/app/data/datasets
       - /home/lusha/storage/star_code/src:/app/src
-    cpuset: "36-39"
+    cpuset: "20-23"
     networks:
       - default

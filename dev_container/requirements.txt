@@ -6,11 +6,11 @@ jupyterlab
 # Data Science Essentials
 numpy
 pandas
-scikit-learn=1.6.1
+scikit-learn>=1.6.1
 scipy
 
 # image processing
-opencv-python=4.11
+opencv-python>=4.11
 scikit-image
 
 # Interactive Widgets & Extensions
