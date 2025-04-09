@@ -42,19 +42,35 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                 payload, endpoint, **kwargs
             )
 
-            consecutive_errors = 0
-            yield Result("ok", ollama_client, id, payload, response)
+            consectuive_errors = 0
+            # yield {**sample, "status": "ok", "id": id, "client": ollama_client, "response": response}
+            yield {
+                "status": "ok",
+                "client": ollama_client,
+                "id": id,
+                "payload": payload,
+                "response": response,
+            }
 
         except requests.RequestException as e:
-            # If an exception occurs return the exception object
-            # which also contains an attribute .response with the
+            # If an execption occurs return the exception object
+            # which also contains an attribute ['response'] with the
             # partial response
-            consecutive_errors += 1
-            if consecutive_errors > threshold:
-                print(f"There have been more than {threshold} consecutive errors! Stopping the program!")
-                raise ValueError(f"There have been {consecutive_errors} consecutive errors!")
-            
-            yield Result("error", ollama_client, id, payload, e)
+            consectuive_errors += 1
+            if consectuive_errors > threshold:
+                print(
+                    f"There have been more than {threshold} consecutive errors! Stopping the program!"
+                )
+                raise ValueError(
+                    f"There have been {consectuive_errors} conscutive errors!"
+                )
+            yield {
+                "status": "error",
+                "client": ollama_client,
+                "id": id,
+                "payload": payload,
+                "response": e,
+            }
 
 def stream_save(response_generator, response_formatter, output_file_path=None):
     start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
@@ -80,9 +96,7 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
             output_dir, f"responses_{start_timestamp}.jsonl"
         )
 
-    error_file = os.path.join(
-        output_dir, f"errors_{start_timestamp}.txt"
-    )
+    error_file = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
     print(f"Responses will be saved to: {output_file_path}")
     print(f"Errors will be logged to: {error_file}")
@@ -91,8 +105,8 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
     with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
 
         for i, result in enumerate(response_generator, 1):
-            status = result.status
-            id = result.id
+            status = result["status"]
+            id = result["id"]
 
             if status == "ok":
                 # Create response object
@@ -102,7 +116,9 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
                 res_f.flush()
             elif status == "error":
                 with open(error_file, "a", buffering=1, encoding="utf-8") as error_f:
-                    log_msg, response_file_msg = response_formatter.format_error_response(result)
+                    log_msg, response_file_msg = (
+                        response_formatter.format_error_response(result)
+                    )
 
                     error_f.write(
                         json.dumps(log_msg, indent=2, ensure_ascii=False) + "\n"
@@ -120,37 +136,40 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
 
             yield result
 
+
 def batch_generate(ollama_client, prompts, output_file_path=None):
 
     def payload_gen(prompts):
         for p in prompts:
             yield {
                 "qid": p["qid"],
-                "payload": {**ollama_client.ollama_params, "prompt":  p["prompt"]}
+                "payload": {**ollama_client.ollama_params, "prompt": p["prompt"]},
             }
-
 
     pipe = Pipeline(
         payload_gen,
-        lambda gen: stream_request(gen, ollama_client, endpoint="generate"),
-        lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path)
+        lambda gen: batch_request(gen, ollama_client, endpoint="generate"),
+        lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path),
     )
     return pipe.consume(prompts)
 
 
 def auto_reply_gen(result_gen, reply):
     for result in result_gen:
-        if result.status == 'ok':
-            messages = result.payload['messages']
-            messages.append(result.response)
-            messages.append({
-                "role": "user",
-                "content": reply
-            })
+        if result["status"] == "ok":
+            messages = result["payload"]["messages"]
+            messages.append(result["response"])
+            messages.append({"role": "user", "content": reply})
 
-            new_response = result.client.chat_completion(messages)
+            new_response = result["client"].chat_completion(messages)
 
-            yield Result(result.status, result.client, result.id, messages, new_response)
+            yield {
+                "status": result["status"],
+                "client": result["client"],
+                "id": result["id"],
+                "payload": messages,
+                "response": new_response,
+            }
         else:
             yield result
 
@@ -161,9 +180,9 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
             yield {
                 "qid": p["qid"],
                 "payload": {
-                     **ollama_client.ollama_params,
-                     "messages": [{"role": "user", "content": p["prompt"]}]
-                 }
+                    **ollama_client.ollama_params,
+                    "messages": [{"role": "user", "content": p["prompt"]}],
+                },
             }
 
     pipe = Pipeline(
@@ -171,7 +190,9 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
         lambda prompts: payload_gen(prompts),
         lambda payload_gen: stream_request(payload_gen, ollama_client, 'chat'),
         lambda resp_gen: auto_reply_gen(resp_gen, reply),
-        lambda resp_gen: stream_save(resp_gen, ChatResponseFormatter(), output_file_path)
+        lambda resp_gen: stream_save(
+            resp_gen, ChatResponseFormatter(), output_file_path
+        ),
     )
 
     return pipe.consume(prompts)
@@ -184,13 +205,17 @@ class ResponseFormatter:
     def format_error_response(self, response_data):
         pass
 
+
 class GenerateResponseFormatter(ResponseFormatter):
     def format_success_response(self, response_data):
-        success_response = {"qid": response_data.id, "response": response_data.response}
+        success_response = {
+            "qid": response_data["id"],
+            "response": response_data["response"],
+        }
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data.response
+        error = response_data["response"]
 
         traceback_text = ""
         if hasattr(error, "__traceback__"):
@@ -201,38 +226,38 @@ class GenerateResponseFormatter(ResponseFormatter):
 
         partial_error_response = getattr(error, "response", "")
         error_log = {
-            "qid": response_data.id,
-            "prompt": response_data.payload,
+            "qid": response_data["id"],
+            "prompt": response_data["payload"],
             "response": partial_error_response,
             "error": traceback_text,
             "timestamp": datetime.now().isoformat(),
         }
         error_response_message = {
-            "qid": response_data.id,
+            "qid": response_data["id"],
             "response": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
             + partial_error_response,
         }
 
         return error_log, error_response_message
 
+
 class ChatResponseFormatter(ResponseFormatter):
     def format_success_response(self, response_data):
-        chat_history = response_data.payload
+        chat_history = response_data["payload"]
 
-        chat_history.append({
-            "role": response_data.response.get("role"),
-            "content": response_data.response.get("content", "")
-        })
+        chat_history.append(
+            {
+                "role": response_data["response"].get("role"),
+                "content": response_data["response"].get("content", ""),
+            }
+        )
 
-        success_response = {
-            "qid": response_data.id,
-            "chat_history": chat_history
-        }
+        success_response = {"qid": response_data["id"], "chat_history": chat_history}
 
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data.response
+        error = response_data["response"]
 
         traceback_text = ""
         if hasattr(error, "__traceback__"):
@@ -243,25 +268,25 @@ class ChatResponseFormatter(ResponseFormatter):
 
         partial_error_response = getattr(error, "response", "")
 
-        chat_history = response_data.payload
-        chat_history.append({
-            "role": partial_error_response.get("role", "unk"),
-            "content": \
-                "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n" +
-                partial_error_response.get("content", "")
-        })
+        chat_history = response_data["payload"]
+        chat_history.append(
+            {
+                "role": partial_error_response.get("role", "unk"),
+                "content": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
+                + partial_error_response.get("content", ""),
+            }
+        )
 
         error_log = {
-            "qid": response_data.id,
-            "prompt": response_data.payload,
+            "qid": response_data["id"],
+            "prompt": response_data["payload"],
             "chat_history": chat_history,
             "error": traceback_text,
             "timestamp": datetime.now().isoformat(),
         }
         error_response_message = {
-            "qid": response_data.id,
-            "chat_history": chat_history
+            "qid": response_data["id"],
+            "chat_history": chat_history,
         }
 
         return error_log, error_response_message
-

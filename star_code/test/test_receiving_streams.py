@@ -1,18 +1,20 @@
 import json
 import os
-import sys
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 
 sys.path.append("../src")
 
+import batch_processor
+import prompt_formatters as pf
+
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
 from ollama_manager import STARPromptGenerator
-import batch_processor
-import prompt_formatters as pf
+
 
 class StreamingReceiverTestUnit(unittest.TestCase):
     def setUp(self):
@@ -70,7 +72,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
         print("response")
         server_response = "Hi, I am alive "
         self.assertEqual(response, server_response)
-        
+
     def test_batch_request(self):
         # Initialize the Ollama manager
         manager = OllamaRequestManager(
@@ -90,11 +92,14 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             prompts.append(prompt)
 
         payload_gen = (
-            {'qid': p['qid'], 'payload': {**manager.ollama_params, 'prompt': p['prompt']}}
-            for p in prompts)
-        
-         
-        for i in batch_processor.batch_request(payload_gen, manager, 'generate'):
+            {
+                "qid": p["qid"],
+                "payload": {**manager.ollama_params, "prompt": p["prompt"]},
+            }
+            for p in prompts
+        )
+
+        for i in batch_processor.batch_request(payload_gen, manager, "generate"):
             pass
 
     def test_request_save_pipeline(self):
@@ -120,7 +125,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
 
             prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
             pformatter = pf.OpenEndedPrompt(prompt_format)
-            
+
             # Get first 10 prompts
             prompts = []
             for i, prompt in enumerate(generator.generate(pformatter)):
@@ -128,27 +133,19 @@ class StreamingReceiverTestUnit(unittest.TestCase):
                     break
                 prompts.append(prompt)
 
-            payload_gen = (
-                {'qid': p['qid'], 'payload': {**manager.ollama_params, 'prompt': p['prompt']}}
-                for p in prompts)
-
-
-            payloads = list(payload_gen)
             output_filename = "test_output/out_resp.jsonl"
 
-            batch_processor.batch_generate(manager, payloads, output_filename)
+            batch_processor.batch_generate(manager, prompts, output_filename)
 
             self.assertTrue(os.path.exists(output_filename))
 
-            with open(output_filename, 'r') as out_f:
+            with open(output_filename, "r") as out_f:
                 responses = [json.loads(line) for line in out_f.readlines()]
 
                 for resp in responses:
-                    content = resp['response']
+                    content = resp["response"]
                     server_response = "Hi, I am alive "
                     self.assertEqual(content, server_response)
-
-
 
 
 if __name__ == "__main__":
