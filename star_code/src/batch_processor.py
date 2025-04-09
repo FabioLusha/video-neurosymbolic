@@ -42,6 +42,7 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                 payload, endpoint, **kwargs
             )
 
+            # When a response is successful reset the error count
             consectuive_errors = 0
             yield {
                 **sample, 
@@ -162,7 +163,7 @@ def auto_reply_gen(result_gen, reply):
 
             new_response = result["client"].chat_completion(messages)
 
-            result['payload'] = messages
+            result['payload']['messages'] = messages
             result['response'] = new_response
 
         yield result
