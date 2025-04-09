@@ -4,7 +4,6 @@ import traceback
 from datetime import datetime
 
 import requests
-
 from ollama_manager import Result
 
 
@@ -148,7 +147,7 @@ def batch_generate(ollama_client, prompts, output_file_path=None):
 
     pipe = Pipeline(
         payload_gen,
-        lambda gen: batch_request(gen, ollama_client, endpoint="generate"),
+        lambda gen: stream_request(gen, ollama_client, endpoint="generate"),
         lambda gen: stream_save(gen, GenerateResponseFormatter(), output_file_path),
     )
     return pipe.consume(prompts)

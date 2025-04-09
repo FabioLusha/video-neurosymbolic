@@ -10,7 +10,6 @@ sys.path.append("../src")
 
 import batch_processor
 import prompt_formatters as pf
-
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
 from ollama_manager import STARPromptGenerator
@@ -73,7 +72,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
         server_response = "Hi, I am alive "
         self.assertEqual(response, server_response)
 
-    def test_batch_request(self):
+    def test_stream_request(self):
         # Initialize the Ollama manager
         manager = OllamaRequestManager(
             base_url="http://localhost:8000", ollama_params={"model": "llama2"}
@@ -99,7 +98,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             for p in prompts
         )
 
-        for i in batch_processor.batch_request(payload_gen, manager, "generate"):
+        for i in batch_processor.stream_request(payload_gen, manager, "generate"):
             pass
 
     def test_request_save_pipeline(self):
