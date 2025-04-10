@@ -12,15 +12,16 @@ services:
       - PYTHONUNBUFFERED=1
     stdin_open: true  # Keep stdin open
     tty: true        # Allocate a pseudo-TTY
-    image: lusha/star_req_manager
+    image: lusha/pydev
     entrypoint: ['python']
     command: [
       '-u', 
-      'src/main.py', 
+      'star_code/src/main.py', 
+      '--task', 'graph_gen',
       '--model', 'deepseek-r1:7b', 
       '--prompt-type', 'mcq_zs_cot', 
       '--mode', 'chat',
-      '--output-file', 'outputs/responses_deepseek-r1:7b_20250404_10:41:00.jsonl']
+      '--output-file', 'star_code/outputs/responses_genframes:7b_202504010_22:47:00.jsonl']
     container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
     deploy:
@@ -30,10 +31,11 @@ services:
             - capabilities: [gpu]
               count: 0
     volumes:
-      - /home/lusha/storage/star_code/outputs:/app/outputs
-      - /home/lusha/storage/star_code/data:/app/data
-      - /home/lusha/datasets/private:/app/data/datasets
-      - /home/lusha/storage/star_code/src:/app/src
+      - /home/lusha/storage:/home/lusha
+      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
+      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
+      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
     cpuset: "20-23"
     networks:
       - default

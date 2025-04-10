@@ -6,10 +6,12 @@ import os
 import pathlib
 
 import re
+from pathlib import Path
 
 import batch_processor
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager, STARPromptGenerator
+from STAR_utils.visualization_tools import vis_utils
 
 SEED = 13471225022025
 
@@ -23,6 +25,7 @@ MODELS = [
     "gemma3:12b",
 ]
 
+BASE_DIR = Path(__file__).parent.parent 
 
 def load_open_qa_prompts():
     system_prompt = _load_prompt_fromfile("data/system_prompt.txt")
@@ -195,8 +198,19 @@ def main():
         "judge": load_llm_as_judge_prompts,
     }
 
+    task_types = {
+        "graph_gen": 0,
+        "graph_understanding": 0
+    }
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Run LLM with different prompt types")
+    parser.add_argument(
+        "--task",
+        choices=task_types.keys(),
+        default="graph_understanding",
+        help="Choose the task to be performed",
+    )
+    
     parser.add_argument(
         "--prompt-type",
         choices=prompt_types.keys(),
@@ -242,12 +256,38 @@ def main():
         responses_file = args.responses_file
         prompt_types["judge"] = functools.partial(prompt_types["judge"], responses_file)
 
+    if args.task == 'graph_gen':
+        from pathlib import Path
+        
+        url = os.environ.get("OLLAMA_URL", "http://lusha_ollama:11435")
+
+        sys_file_path = BASE_DIR / 'data' / 'prompts' / 'img_captioning/system_prompt.txt'
+        
+        sys_prompt = _load_prompt_fromfile(sys_file_path)
+        ollama_params={
+                    "model": "gemma3:4b",
+                    "system": sys_prompt,
+                    "stream": True,
+                    "options": {
+                        "num_ctx": 10240,
+                        "temperature": 0.1,
+                        "num_predict": 1024,
+                        "seed": SEED,
+                    },
+                }
+
+        client = OllamaRequestManager(url, ollama_params)
+        streaming_frame_generation(client, args.output_file, iters=-1)
+        return
+    
     # Load the selected prompts
     load_func = prompt_types[args.prompt_type]
     system_prompt, prompt_formatter = load_func()
 
     ids_file_path = args.ids_file
     # Run with the selected configuration
+    
+    
     run_with_prompts(
         system_prompt=system_prompt,
         prompt_formatter=prompt_formatter,
@@ -259,25 +299,26 @@ def main():
     )
 
 
-def generate_frames(max_sample=10):
-    from STAR_utils.visualization_tools import vis_utils
+def generate_frames(iters=-1, max_sample=10):
 
     star_data = []
-    with open("../data/datasets/STAR/STAR_annotations/STAR_val.json") as in_file:
+    val_path = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
+    with open(val_path) as in_file:
         star_data = json.load(in_file)
 
-    raw_frame_dir = pathlib.Path("../data/datasets/action-genome/frames/")
+    raw_frame_dir = BASE_DIR / "data/datasets/action-genome/frames"
 
     for sample in star_data:
-        frame_ids = vis_utils.sample_frames(
-            list(sample["situations"].keys()), max_sample
-        )
-        frame_ids
+        frame_ids = sorted(list(sample['situations'].keys()))
+        frame_ids = vis_utils.sample_frames(frame_ids, max_sample)
 
         frame_dir = raw_frame_dir / f"{sample['video_id']}.mp4"
         b64_encodings = []
         for f_id in frame_ids:
-            with open(frame_dir / f"{f_id}.png", "rb") as f:
+            img_path = frame_dir / f"{f_id}.png"
+            if not img_path.exists():
+                continue
+            with open(img_path, "rb") as f:
                 img_bytes = f.read()
                 b64_encodings.append(
                     {
@@ -286,64 +327,46 @@ def generate_frames(max_sample=10):
                     }
                 )
 
-            yield [
-                {"question_id": sample["question_id"], **encoding}
-                for encoding in b64_encodings
-            ]
+        frames = []
+        for encoding in b64_encodings:
+            frames.append({"question_id": sample["question_id"], **encoding})
+            
+        yield frames
+
+        iters -= 1
+        if iters == 0:
+            return # stop generation
 
 def extract_frame_description(text):
+    # the ?s: in the middle capturing group sets the flag
+    # re.DOTALL
     pattern = "(?<=<scene_graph>)(?s:.+)(?=</scene_graph)"
     match = re.search(pattern, text)
 
     return match.group(0) if match else ""
 
+def frame_aggregator(stream):
 
-def streaming_frame_generation(ollama_client, frames, output_file):
+    o1 = next(stream)
+    agg = []
+    while o1 is not None:
+        frame_id = o1.pop("frame_id")
+        sg = o1.pop("sg")
+        agg.append(f"\nFrame {frame_id}:\n{sg}")
+        try:
+            o2 = next(stream)
+            if o2["qid"] != o1["qid"]:
+                yield {**o1, "stsg": ''.join(agg)}
+                agg = []
 
-    def payload_gen(frames):
-        for frame in frames:
-            req_obj = {
-                "qid": frame["question_id"],
-                "frame_id": frame["frame_id"],
-                "payload": {
-                    **ollama_client.ollama_params,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt1,
-                            "images": [frame["encoding"]],
-                        }
-                    ],
-                },
-            }
+            o1 = o2
+        except StopIteration:
+            yield {**o1, "stsg": ''.join(agg)}
+            return # Generator stops here
 
-            yield req_obj
-
-    def frame_aggregator(stream):
-        for obj in stream:
-            obj['id']
-
-    frames = generate_frames(max_sample=10)
-    bp = batch_processor
-    graph_gen_pipeline = bp.Pipeline(
-        payload_gen,
-        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, 'chat'),
-        lambda resp_gen: bp.auto_reply_gen(resp_gen, prompt2),
-        lambda resp_gen: ({**stream_obj, 'stsg': extract_frame_description(stream_obj['response'])} for stream_obj in resp_gen)
-        # ===============
-        # aggregate frames
-        lambda resp_gen:
-        lambda resp_gen: bp.stream_save(
-            resp_gen, ChatResponseFormatter(), output_file_path
-        ),
-
-    )
-
-
-if __name__ == "__main__":
-    main()
-
-prompt1 = """\
+def streaming_frame_generation(ollama_client, output_file_path, iters=-1):
+    
+    prompt1 = """\
     Look carefully at this image and identify all objects and relationships present.
 
     First, list all distinct objects you can detect in the image. Be thorough and specific with your object labels (e.g., "young woman" rather than just "person", "wooden chair" rather than just "chair").
@@ -357,7 +380,7 @@ prompt1 = """\
     Think step by step.\
 """
 
-prompt2 = """\
+    prompt2 = """\
     Thank you. Now organize the objects and relationships you identified into a formal scene graph using this format:
     object1 ---- relationship ---- object2
     
@@ -376,3 +399,46 @@ prompt2 = """\
 
     Your scene graph:\
     """
+
+    def payload_gen(situations):
+        for frames in situations:
+            for frame in frames:
+                req_obj = {
+                    "qid": frame["question_id"],
+                    "frame_id": frame["frame_id"],
+                    "payload": {
+                        **ollama_client.ollama_params,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": prompt1,
+                                "images": [frame["encoding"]],
+                            }
+                        ],
+                    },
+                }
+
+                yield req_obj
+
+
+    bp = batch_processor
+    graph_gen_pipeline = bp.Pipeline(
+        payload_gen,
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, endpoint='chat'),
+        lambda stream: bp.auto_reply_gen(stream, prompt2),
+        lambda stream: ({**stream_obj, 'sg': extract_frame_description(stream_obj['response']['content'])} for stream_obj in stream),
+        lambda stream: frame_aggregator(stream),
+        lambda stream: bp.stream_save(
+            stream, bp.GeneratedGraphFormatter(), output_file_path
+        ),
+
+    )
+
+    situations = (situation_frames for situation_frames in generate_frames(iters=-1, max_sample=10))
+    graph_gen_pipeline.consume(situations)
+
+
+if __name__ == "__main__":
+    main()
+
+

@@ -25,7 +25,7 @@ class Pipeline:
         for apply_new_gen in self.generator_transforms:
             generator = apply_new_gen(generator)
 
-        for i in generator:
+        for _ in generator:
             continue
 
         return
@@ -296,6 +296,72 @@ class ChatResponseFormatter(ResponseFormatter):
             "qid": response_data["id"],
             "payload": response_data["payload"],
             "chat_history": chat_history,
+            "error": traceback_text,
+            "timestamp": datetime.now().isoformat(),
+        }
+        error_response_message = {
+            "qid": response_data["id"],
+            "chat_history": chat_history,
+        }
+
+        return error_log, error_response_message
+
+class GeneratedGraphFormatter(ResponseFormatter):
+    def format_success_response(self, response_data):
+        chat_history = response_data["payload"]["messages"]
+
+        chat_history.append(
+            {
+                "role": response_data["response"].get("role"),
+                "content": response_data["response"].get("content", ""),
+            }
+        )
+        # remove img encoding from the chat_history
+        if 'images' in chat_history[0]:
+            print('Removing image entry')
+            del chat_history[0]['images']
+        
+        stsg = response_data["stsg"]
+        success_response = {
+            "qid": response_data["id"],
+            "chat_history": chat_history,
+            "stsg": stsg,
+        }
+
+        return success_response
+
+    def format_error_response(self, response_data):
+        error = response_data["response"]
+
+        traceback_text = ""
+        if hasattr(error, "__traceback__"):
+            tb = error.__traceback__
+            # Format the traceback
+            tb_lines = traceback.format_exception(type(error), error, tb)
+            traceback_text = "".join(tb_lines)
+
+        partial_error_response = getattr(error, "response", "")
+
+        chat_history = response_data["payload"]["message"]
+        chat_history.append(
+            {
+                "role": partial_error_response.get("role", "unk"),
+                "content": "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\n"
+                + partial_error_response.get("content", ""),
+            }
+        )
+
+        print(f'Chat history keys: {chat_history[0].keys()}')
+        if 'images' in chat_history[0]:
+            print('Error branch: Removing image entry')
+            del chat_history[0]['images']
+            
+        stsg = response_data["stsg"]
+        error_log = {
+            "qid": response_data["id"],
+            "payload": response_data["payload"],
+            "chat_history": chat_history,
+            "stsg": stsg,
             "error": traceback_text,
             "timestamp": datetime.now().isoformat(),
         }
