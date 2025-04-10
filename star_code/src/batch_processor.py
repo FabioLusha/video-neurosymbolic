@@ -13,19 +13,36 @@ class Pipeline:
     def __init__(self, *generators_funs):
         self.generator_transforms = generators_funs
 
+        # Compose the generators
+        self.pipeline = self.generator_transforms[0]
+
+    def pipe(self, generator):
+        self.generator_transforms.append(generator)
+
     def consume(self, data):
-        # I create a generator for data
+        # consume the generator to have the effect
         generator = (d for d in data)
         for apply_new_gen in self.generator_transforms:
             generator = apply_new_gen(generator)
 
+        for i in generator:
+            continue
+
+        return
+
+    def to_list(self, data):
         # consume the generator to have the effect
+        generator = (d for d in data)
+        for apply_new_gen in self.generator_transforms:
+            generator = apply_new_gen(generator)
+
         result = []
         for i in generator:
             result.append(i)
 
         # some pipeline may produce only side-effects
         return result if result != [] else None
+
 
 def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
     consecutive_errors = 0
@@ -45,11 +62,12 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
             # When a response is successful reset the error count
             consectuive_errors = 0
             yield {
-                **sample, 
-                "status": "ok", 
-                "id": id, 
-                "client": ollama_client, 
-                "response": response
+                **sample,
+                "status": "ok",
+                "id": id,
+                "client": ollama_client,
+                "response": response,
+                # don't need the payload anymore because it is included in **sample
             }
 
         except requests.RequestException as e:
@@ -65,12 +83,14 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                     f"There have been {consectuive_errors} conscutive errors!"
                 )
             yield {
-                **sample, 
-                "status": "error", 
-                "id": id, 
-                "client": ollama_client, 
-                "response": e
+                **sample,
+                "status": "error",
+                "id": id,
+                "client": ollama_client,
+                "response": e,
+                # don't need the payload anymore because it is included in **sample
             }
+
 
 def stream_save(response_generator, response_formatter, output_file_path=None):
     start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
@@ -163,10 +183,11 @@ def auto_reply_gen(result_gen, reply):
 
             new_response = result["client"].chat_completion(messages)
 
-            result['payload']['messages'] = messages
-            result['response'] = new_response
+            result["payload"]["messages"] = messages
+            result["response"] = new_response
 
         yield result
+
 
 def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=None):
     def payload_gen(prompts):
@@ -175,14 +196,14 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
                 "qid": p["qid"],
                 "payload": {
                     **ollama_client.ollama_params,
-                    "messages": [{"role": "user", "content": p["prompt"]}]
-                }
+                    "messages": [{"role": "user", "content": p["prompt"]}],
+                },
             }
 
     pipe = Pipeline(
         # the first generator converts the prompt to the right format
-        lambda prompts: payload_gen(prompts),
-        lambda payload_gen: stream_request(payload_gen, ollama_client, 'chat'),
+        payload_gen,
+        lambda payload_gen: stream_request(payload_gen, ollama_client, "chat"),
         lambda resp_gen: auto_reply_gen(resp_gen, reply),
         lambda resp_gen: stream_save(
             resp_gen, ChatResponseFormatter(), output_file_path
@@ -221,7 +242,7 @@ class GenerateResponseFormatter(ResponseFormatter):
         partial_error_response = getattr(error, "response", "")
         error_log = {
             "qid": response_data["id"],
-            "prompt": response_data["payload"],
+            "payload": response_data["payload"],
             "response": partial_error_response,
             "error": traceback_text,
             "timestamp": datetime.now().isoformat(),
@@ -237,7 +258,7 @@ class GenerateResponseFormatter(ResponseFormatter):
 
 class ChatResponseFormatter(ResponseFormatter):
     def format_success_response(self, response_data):
-        chat_history = response_data["payload"]
+        chat_history = response_data["payload"]["messages"]
 
         chat_history.append(
             {
@@ -262,7 +283,7 @@ class ChatResponseFormatter(ResponseFormatter):
 
         partial_error_response = getattr(error, "response", "")
 
-        chat_history = response_data["payload"]
+        chat_history = response_data["payload"]["message"]
         chat_history.append(
             {
                 "role": partial_error_response.get("role", "unk"),
@@ -273,7 +294,7 @@ class ChatResponseFormatter(ResponseFormatter):
 
         error_log = {
             "qid": response_data["id"],
-            "prompt": response_data["payload"],
+            "payload": response_data["payload"],
             "chat_history": chat_history,
             "error": traceback_text,
             "timestamp": datetime.now().isoformat(),

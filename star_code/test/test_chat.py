@@ -69,7 +69,8 @@ class TestChatService(unittest.TestCase):
         for res in auto_rep_gen:
             new_result = res
 
-        self.assertEqual(len(new_result["payload"]), 3)
+        print(new_result.keys())
+        self.assertEqual(len(new_result["payload"]["messages"]), 3)
         # The scaffold server repeats the message
         self.assertTrue(new_result["response"].get("content").strip().endswith(reply))
 
