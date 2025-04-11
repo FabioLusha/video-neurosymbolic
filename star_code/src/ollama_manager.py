@@ -188,10 +188,11 @@ class STARPromptGenerator:
         try:
             with open(self.input_filename, "r") as in_file:
                 q_stsg_data = json.load(in_file)
+                id_key = "qid" if "qid" in q_stsg_data[0] else "question_id"
 
                 if ids:
                     q_stsg_data = [
-                        sample for sample in q_stsg_data if sample["question_id"] in ids
+                        sample for sample in q_stsg_data if sample[id_key] in ids
                     ]
 
                 for i, sample in enumerate(q_stsg_data, 1):
@@ -202,7 +203,7 @@ class STARPromptGenerator:
 
                     prompt = prompt_formatter.format(sample)
 
-                    yield {"qid": sample["question_id"], "prompt": prompt}
+                    yield {"qid": sample[id_key], "prompt": prompt}
 
         except IOError as e:
             raise IOError(f"Error reading question and stsg file: {e}") from e
