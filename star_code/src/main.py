@@ -154,7 +154,7 @@ def run_with_prompts(
         with open(ids_filepath, "r") as f:
             ids = [json.loads(line)["qid"] for line in f.readlines()]
 
-    prompt_generator = STARPromptGenerator(input_filename=input_filepath)
+    prompt_generator = STARPromptGenerator(questions_file_path=input_filepath)
 
     # Generate prompts
     prompts = list(
@@ -378,7 +378,7 @@ def streaming_frame_generation(ollama_client, output_file_path, iters=-1):
     - Relative positions (next to, between, surrounding, etc.)
 
     Think step by step.\
-"""
+    """
 
     prompt2 = """\
     Thank you. Now organize the objects and relationships you identified into a formal scene graph using this format:

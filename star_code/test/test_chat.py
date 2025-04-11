@@ -88,7 +88,7 @@ class TestChatService(unittest.TestCase):
             json.dump(test_data, in_f)
 
             in_f.seek(0)
-            generator = STARPromptGenerator(input_filename=in_f.name)
+            generator = STARPromptGenerator(questions_file_path=in_f.name)
 
             prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
             pformatter = pf.OpenEndedPrompt(prompt_format)

@@ -162,18 +162,26 @@ class OllamaChatHandler(OllamaStreamHandler):
 
 class STARPromptGenerator:
 
-    def __init__(self, input_filename):
-        if not os.path.exists(input_filename):
-            raise OSError(f"No such file or directory: '{input_filename}'")
+    def __init__(self, questions_file_path, stsg_file_path=None):
+        if not os.path.exists(questions_file_path):
+            raise OSError(f"No such file or directory: '{questions_file_path}'")
+        self.question_file_path = questions_file_path
+        
+        if stsg_file_path is None:
+            stsg_file_path = questions_file_path
+        else:
+            if not os.path.exists(stsg_file_path):
+                raise OSError(f"No such file or directory: '{stsg_file_path}'")
+        
+        self.stsg_file_path = stsg_file_path
 
-        self.input_filename = input_filename
 
     def generate(self, prompt_formatter, ids=None, start=0, limit=None):
         """
         Args:
             prompt_formatter (PromptFormatter):
                 An object that given a data point form the STAR dataset
-                formats the prompt according to what is sepcified in the object
+                formats the prompt according to what is specified in the object
 
             start (int): from which sample to start generation
 
@@ -186,24 +194,38 @@ class STARPromptGenerator:
             prompt
         """
         try:
-            with open(self.input_filename, "r") as in_file:
-                q_stsg_data = json.load(in_file)
-                id_key = "qid" if "qid" in q_stsg_data[0] else "question_id"
+            with open(self.question_file_path, "r") as q_file:
+                question_data = json.load(q_file)
 
-                if ids:
-                    q_stsg_data = [
-                        sample for sample in q_stsg_data if sample[id_key] in ids
-                    ]
-
-                for i, sample in enumerate(q_stsg_data, 1):
+                stsg_data = None
+                if self.stsg_file_path != self.question_file_path:
+                    with open(self.stsg_file_path, "r") as stsg_file:
+                        list_data = [json.loads(line) for line in stsg_file.readlines()]
+                        
+                        s_id_key = "qid" if "qid" in stsg_data[0] else "question_id"
+                        for item in list_data:
+                            item_id = item.pop(s_id_key)
+                            stsg_data[item_id] = item['stsg']
+                        
+                q_id_key = "qid" if "qid" in question_data[0] else "question_id"
+                
+                for i, sample in enumerate(question_data, 1):
                     if i < start:
                         continue
                     if limit and i > (limit + start):
                         break
 
+                    if ids and sample[q_id_key] in ids:
+                        continue
+                    
+                    # Below I merge the question key-value pairs with
+                    # the stsg (note the key-values pairs on the right take priority
+                    # when there are keys in common, i.e. the stsg data on the right overwrites
+                    # the stsg data on sample if there is any)
+                    sample =  sample | stsg
                     prompt = prompt_formatter.format(sample)
 
-                    yield {"qid": sample[id_key], "prompt": prompt}
+                    yield {"qid": sample[q_id_key], "prompt": prompt}
 
         except IOError as e:
             raise IOError(f"Error reading question and stsg file: {e}") from e
