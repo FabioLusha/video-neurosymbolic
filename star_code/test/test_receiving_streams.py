@@ -64,7 +64,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
     def test_streaming_receiver(self):
         # Initialize the Ollama manager
         manager = OllamaRequestManager(
-            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
         response = manager.generate_completion("hi")
@@ -75,7 +75,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
     def test_stream_request(self):
         # Initialize the Ollama manager
         manager = OllamaRequestManager(
-            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
         # Initialize the generator
@@ -104,7 +104,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
     def test_request_save_pipeline(self):
         # Initialize the Ollama manager
         manager = OllamaRequestManager(
-            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
         test_data = [

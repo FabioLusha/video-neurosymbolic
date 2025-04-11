@@ -69,5 +69,5 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "scaffold_server:scaffold_server", host="localhost", port=8000, reload=True
+        "scaffold_server:scaffold_server", host="localhost", port=5555, reload=True
     )

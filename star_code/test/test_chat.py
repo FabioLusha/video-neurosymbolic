@@ -35,7 +35,7 @@ class TestChatService(unittest.TestCase):
 
     def test_chat_service(self):
         manager = OllamaRequestManager(
-            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
         chat_server = ChatServer(manager)
@@ -49,7 +49,7 @@ class TestChatService(unittest.TestCase):
         reply = "Automatic reply"
 
         manager = OllamaRequestManager(
-            base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+            base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
         messages = [{"role": "user", "content": "First message"}]
@@ -94,7 +94,7 @@ class TestChatService(unittest.TestCase):
             pformatter = pf.OpenEndedPrompt(prompt_format)
 
             manager = OllamaRequestManager(
-                base_url="http://localhost:8000", ollama_params={"model": "llama2"}
+                base_url="http://localhost:5555", ollama_params={"model": "llama2"}
             )
 
             # Create output directory
