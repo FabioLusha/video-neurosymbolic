@@ -1,15 +1,15 @@
 import json
 import logging
 import os
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 
 import requests
-
 from torch.utils.data import Dataset
 
 import prompt_formatters as pf
 
 Result = namedtuple("Result", ["status", "client", "id", "payload", "response"])
+
 
 class OllamaRequestManager:
 
@@ -124,6 +124,7 @@ class OllamaRequestManager:
 
         return handler.finalize_result(result)
 
+
 # Handler classes for different API endpoints
 class OllamaStreamHandler:
     def init_result(self):
@@ -162,23 +163,20 @@ class OllamaChatHandler(OllamaStreamHandler):
         return {"content": "".join(result["token_stream"]), "role": result["role"]}
 
 
-
-
 class STARPromptGenerator:
 
     def __init__(self, questions_file_path, stsg_file_path=None):
         if not os.path.exists(questions_file_path):
             raise OSError(f"No such file or directory: '{questions_file_path}'")
         self.question_file_path = questions_file_path
-        
+
         if stsg_file_path is None:
             stsg_file_path = questions_file_path
         else:
             if not os.path.exists(stsg_file_path):
                 raise OSError(f"No such file or directory: '{stsg_file_path}'")
-        
-        self.stsg_file_path = stsg_file_path
 
+        self.stsg_file_path = stsg_file_path
 
     def load_stsg_data(file_path):
         if not os.path.exists(file_path):
@@ -198,11 +196,11 @@ class STARPromptGenerator:
         id_key = "qid" if "qid" in first_item else "question_id"
 
         return {
-            item.pop(id_key): item['stsg']
+            item.pop(id_key): item["stsg"]
             for item in stsg_items
-            if id_key in item and 'stsg' in item
+            if id_key in item and "stsg" in item
         }
-    
+
     def generate(self, prompt_formatter, ids=None, start=0, limit=None):
         """
         Args:
@@ -228,14 +226,14 @@ class STARPromptGenerator:
                 if self.stsg_file_path != self.question_file_path:
                     with open(self.stsg_file_path, "r") as stsg_file:
                         list_data = [json.loads(line) for line in stsg_file.readlines()]
-                        
+
                         s_id_key = "qid" if "qid" in stsg_data[0] else "question_id"
                         for item in list_data:
                             item_id = item.pop(s_id_key)
-                            stsg_data[item_id] = item['stsg']
-                        
+                            stsg_data[item_id] = item["stsg"]
+
                 q_id_key = "qid" if "qid" in question_data[0] else "question_id"
-                
+
                 for i, sample in enumerate(question_data, 1):
                     if i < start:
                         continue
@@ -244,12 +242,12 @@ class STARPromptGenerator:
 
                     if ids and sample[q_id_key] in ids:
                         continue
-                    
+
                     # Below I merge the question key-value pairs with
                     # the stsg (note the key-values pairs on the right take priority
                     # when there are keys in common, i.e. the stsg data on the right overwrites
                     # the stsg data on sample if there is any)
-                    sample =  sample | stsg
+                    sample = sample | stsg
                     prompt = prompt_formatter.format(sample)
 
                     yield {"qid": sample[q_id_key], "prompt": prompt}
@@ -273,62 +271,80 @@ class STARPromptGenerator:
 
         except IOError as e:
             raise IOError("Error saving prompts") from e
-        
+
 
 class PromptDataset(Dataset):
-    def __init__(self, qa_file_path, prompt_formatter, stsg_file_path=None, ids=None, limit=None, stsg_buffer_size=1000):
+    def __init__(
+        self,
+        qa_file_path,
+        prompt_formatter,
+        stsg_file_path=None,
+        ids=None,
+        limit=None,
+        stsg_buffer_size=1000,
+    ):
         if not os.path.exists(qa_file_path):
             raise OSError(f"No such file or directory: '{qa_file_path}'")
         self.qa_file_path = qa_file_path
-        
+
         if stsg_file_path and not os.path.exists(stsg_file_path):
             raise OSError(f"No such file or directory: '{stsg_file_path}'")
-        
+
         self.prompt_formatter = prompt_formatter
         self.stsg_file_path = stsg_file_path
-        
-        
+
         self._stsg_index = None
         self._stsg_buffer = OrderedDict()
+        self.stsg_buffer_size = 1000
         self._stsg_file_handle = None
         self.q_id_key = None
-        
+
         # Load qa and build STSG index
         self.qa = []
-        with open(self.qa_file_path, 'r') as f:
-            self.qa  = json.load(f)
-            
+        with open(self.qa_file_path, "r") as f:
+            self.qa = json.load(f)
+
         if len(self.qa) > 0:
-            self.q_id_key = 'qid' if 'qid' in self.qa[0] else 'question_id'
-        
+            self.q_id_key = "qid" if "qid" in self.qa[0] else "question_id"
+
         if ids:
-            self.qa = {q for i, q in enumerate(self.qa) 
-                                if q[self.q_id_key] in ids and (limit is None or i < limit)}
+            self.qa = [
+                q
+                for i, q in enumerate(self.qa)
+                if q[self.q_id_key] in ids and (limit is None or i < limit)
+            ]
         if self.stsg_file_path:
             self._build_stsg_index()
 
-            
     def __len__(self):
         return len(self.qa)
-    
+
     def __getitem__(self, idx):
         if idx >= len(self):
             raise IndexError
-            
+
         sample = self.qa[idx]
         question_id = sample.get(self.q_id_key)
-        
+
         # Get STSG data if available
         stsg_data = {}
         if self.stsg_file_path and question_id:
-            stsg_data = self._get_stsg_data(question_id)
-        
+            # TODO: revert to simple access, the buffer needs attention
+            with open(self.stsg_file_path) as f:
+                f.seek(self._stsg_index[question_id])
+                line = f.readline()
+                stsg_data = json.loads(line)
+
+            # stsg_data = self._get_stsg_data(question_id)
+
         # Merge the question key-value pairs with
         # the stsg (note the key-values pairs on the right take priority
         # when there are keys in common, i.e. the stsg data on the right overwrites
         # the stsg data on sample if there is any)
-        sample =  sample | stsg_data
+        sample = {**sample, **stsg_data}
         prompt = self.prompt_formatter.format(sample)
+
+        return {"qid": question_id, "prompt": prompt}
 
     def _build_stsg_index(self):
         self._stsg_index = {}
@@ -371,15 +387,17 @@ class PromptDataset(Dataset):
                         )
                         continue
         except FileNotFoundError:
-            raise FileNotFoundError(f"STSG file not found during indexing: {self.stsg_file_path}")
+            raise FileNotFoundError(
+                f"STSG file not found during indexing: {self.stsg_file_path}"
+            )
         except IOError as e:
             raise IOError(f"Error reading STSG file during indexing: {e}") from e
-        
+
     def _load_stsg_chunk(self, question_ids):
         """Load a chunk of STSG data for the given question IDs."""
         if not self._stsg_file_handle:
-            self._stsg_file_handle = open(self.stsg_file_path, 'r')
-        
+            self._stsg_file_handle = open(self.stsg_file_path, "r")
+
         # Clear buffer if it's too large
         if len(self._stsg_buffer) > self.stsg_buffer_size * 2:
             self._stsg_buffer.clear()
@@ -399,7 +417,7 @@ class PromptDataset(Dataset):
             line = self._stsg_file_handle.readline()
             try:
                 data = json.loads(line)
-                self._stsg_buffer[qid] = data.get('stsg', {})
+                self._stsg_buffer[qid] = {"stsg": data.get("stsg", "No STSG data!")}
             except json.JSONDecodeError:
                 continue
 
@@ -407,7 +425,7 @@ class PromptDataset(Dataset):
         """Get STSG data for a question with buffered loading."""
         if question_id in self._stsg_buffer:
             return self._stsg_buffer[question_id]
-        
+
         # Pre-load a chunk around this question
         if question_id in self._stsg_index:
             idx = list(self._stsg_index.keys()).index(question_id)
@@ -415,11 +433,20 @@ class PromptDataset(Dataset):
             end = min(len(self._stsg_index), idx + self.stsg_buffer_size // 2)
             chunk_ids = list(self._stsg_index.keys())[start:end]
             self._load_stsg_chunk(chunk_ids)
-        
+
         # TODO: handle default value
         if question_id not in self._stsg_buffer:
-            print(f"Warning: {question_id} has no STSG data, filling the default value 'No STSG data'")
+            print(
+                f"Warning: {question_id} has no STSG data, filling the default value 'No STSG data'"
+            )
         return self._stsg_buffer.get(question_id, "No STSG data")
+
+    def __del__(self):
+        """Clean up resources."""
+        if hasattr(self, "_stsg_file_handle") and self._stsg_file_handle:
+            self._stsg_file_handle.close()
+
+
 class QuestionProcessor:
 
     def __init__(self, stsg_buffer_size=1000):
