@@ -9,9 +9,6 @@ sys.path.append("../src")
 
 import prompt_formatters as pf  # noqa: E402
 
-# noqa: E402 - disables the warning for this line
-from ollama_manager import STARPromptGenerator  # noqa: E402
-
 SEED = 11270525022025
 random.seed(SEED)
 

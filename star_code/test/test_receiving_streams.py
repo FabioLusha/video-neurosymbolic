@@ -12,7 +12,7 @@ import batch_processor
 import prompt_formatters as pf
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
-from ollama_manager import STARPromptGenerator
+from ollama_manager import PromptDataset
 
 
 class StreamingReceiverTestUnit(unittest.TestCase):
@@ -78,25 +78,24 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             base_url="http://localhost:5555", ollama_params={"model": "llama2"}
         )
 
-        # Initialize the generator
-        generator = STARPromptGenerator(input_filename=self.temp_data_file.name)
-
         prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
-        pformatter = pf.OpenEndedPrompt(prompt_format)
+        prompt_formatter = pf.OpenEndedPrompt(prompt_format)
+
+        # Initialize the generator
+        dataset = PromptDataset(self.temp_data_file.name, prompt_formatter)
 
         prompts = []
-        for i, prompt in enumerate(generator.generate(pformatter)):
+        for i in range(len(dataset)):
             if i >= 10:
                 break
-            prompts.append(prompt)
+            prompts.append(dataset[i])
 
         payload_gen = (
             {
                 "qid": p["qid"],
                 "payload": {**manager.ollama_params, "prompt": p["prompt"]},
             }
-            for p in prompts
-        )
+            for p in prompts)
 
         for i in batch_processor.stream_request(payload_gen, manager, "generate"):
             pass
@@ -118,19 +117,20 @@ class StreamingReceiverTestUnit(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
             json.dump(test_data, in_f)
-
             in_f.seek(0)
-            generator = STARPromptGenerator(input_filename=in_f.name)
 
             prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
-            pformatter = pf.OpenEndedPrompt(prompt_format)
+            prompt_formatter = pf.OpenEndedPrompt(prompt_format)
+
+            # Initialize the generator
+            dataset = PromptDataset(self.temp_data_file.name, prompt_formatter)
 
             # Get first 10 prompts
             prompts = []
-            for i, prompt in enumerate(generator.generate(pformatter)):
+            for i in range(len(dataset)):
                 if i >= 10:
                     break
-                prompts.append(prompt)
+                prompts.append(dataset[i])
 
             output_filename = "test_output/out_resp.jsonl"
 

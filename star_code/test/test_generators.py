@@ -13,7 +13,6 @@ import prompt_formatters as pf
 
 # noqa: E402 - disables the warning for this line
 from ollama_manager import OllamaRequestManager  # noqa: E402
-from ollama_manager import STARPromptGenerator
 
 
 class GeneratorTestUnit(unittest.TestCase):
@@ -48,4 +47,3 @@ class GeneratorTestUnit(unittest.TestCase):
             for i, resp in zip(inp, responses):
                 content = resp["response"]
                 self.assertEqual(i, content)
-

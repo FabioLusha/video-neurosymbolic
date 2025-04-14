@@ -4,7 +4,6 @@ import traceback
 from datetime import datetime
 
 import requests
-
 from ollama_manager import Result
 
 
@@ -60,7 +59,7 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
             )
 
             # When a response is successful reset the error count
-            consectuive_errors = 0
+            consecutive_errors = 0
             yield {
                 **sample,
                 "status": "ok",
@@ -74,13 +73,13 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
             # If an execption occurs return the exception object
             # which also contains an attribute ['response'] with the
             # partial response
-            consectuive_errors += 1
-            if consectuive_errors > threshold:
+            consecutive_errors += 1
+            if consecutive_errors > threshold:
                 print(
                     f"There have been more than {threshold} consecutive errors! Stopping the program!"
                 )
                 raise ValueError(
-                    f"There have been {consectuive_errors} conscutive errors!"
+                    f"There have been {consecutive_errors} conscutive errors!"
                 )
             yield {
                 **sample,
@@ -283,7 +282,8 @@ class ChatResponseFormatter(ResponseFormatter):
 
         partial_error_response = getattr(error, "response", "")
 
-        chat_history = response_data["payload"]["message"]
+        print(response_data.keys())
+        chat_history = response_data["message"]
         chat_history.append(
             {
                 "role": partial_error_response.get("role", "unk"),
@@ -306,6 +306,7 @@ class ChatResponseFormatter(ResponseFormatter):
 
         return error_log, error_response_message
 
+
 class GeneratedGraphFormatter(ResponseFormatter):
     def format_success_response(self, response_data):
         chat_history = response_data["payload"]["messages"]
@@ -317,10 +318,10 @@ class GeneratedGraphFormatter(ResponseFormatter):
             }
         )
         # remove img encoding from the chat_history
-        if 'images' in chat_history[0]:
-            print('Removing image entry')
-            del chat_history[0]['images']
-        
+        if "images" in chat_history[0]:
+            print("Removing image entry")
+            del chat_history[0]["images"]
+
         stsg = response_data["stsg"]
         success_response = {
             "qid": response_data["id"],
@@ -351,11 +352,11 @@ class GeneratedGraphFormatter(ResponseFormatter):
             }
         )
 
-        print(f'Chat history keys: {chat_history[0].keys()}')
-        if 'images' in chat_history[0]:
-            print('Error branch: Removing image entry')
-            del chat_history[0]['images']
-            
+        print(f"Chat history keys: {chat_history[0].keys()}")
+        if "images" in chat_history[0]:
+            print("Error branch: Removing image entry")
+            del chat_history[0]["images"]
+
         stsg = response_data["stsg"]
         error_log = {
             "qid": response_data["id"],

@@ -11,9 +11,8 @@ sys.path.append("../src")
 import batch_processor
 import prompt_formatters as pf  # noqa: E402
 from chat_utils import ChatServer
-
 # noqa: E402 - disables warning for this line
-from ollama_manager import OllamaRequestManager, STARPromptGenerator
+from ollama_manager import OllamaRequestManager, PromptDataset
 
 
 class TestChatService(unittest.TestCase):
@@ -69,7 +68,6 @@ class TestChatService(unittest.TestCase):
         for res in auto_rep_gen:
             new_result = res
 
-        print(new_result.keys())
         self.assertEqual(len(new_result["payload"]["messages"]), 3)
         # The scaffold server repeats the message
         self.assertTrue(new_result["response"].get("content").strip().endswith(reply))
@@ -86,12 +84,12 @@ class TestChatService(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
             json.dump(test_data, in_f)
-
             in_f.seek(0)
-            generator = STARPromptGenerator(questions_file_path=in_f.name)
 
             prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
-            pformatter = pf.OpenEndedPrompt(prompt_format)
+            prompt_formatter = pf.OpenEndedPrompt(prompt_format)
+
+            dataset = PromptDataset(in_f.name, prompt_formatter)
 
             manager = OllamaRequestManager(
                 base_url="http://localhost:5555", ollama_params={"model": "llama2"}
@@ -102,10 +100,10 @@ class TestChatService(unittest.TestCase):
 
             # Get first 10 prompts
             prompts = []
-            for i, prompt in enumerate(generator.generate(pformatter)):
+            for i in range(len(dataset)):
                 if i >= 10:
                     break
-                prompts.append(prompt)
+                prompts.append(dataset[i])
 
             reply = "This is an automatic reply"
             batch_processor.batch_automatic_chat_reply(
