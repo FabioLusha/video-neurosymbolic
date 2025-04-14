@@ -280,7 +280,7 @@ def main():
                 }
 
         client = OllamaRequestManager(url, ollama_params)
-        parallel_streaming_frames(client, args.output_file, ids=ids, iters=-1)
+        streaming_frame_generation(client, args.output_file, ids=ids, iters=-1)
         return
     
     # Load the selected prompts
@@ -368,7 +368,7 @@ def frame_aggregator(stream):
             yield {**o1, "stsg": ''.join(agg)}
             return # Generator stops here
 
-def streaming_frame_generation(ollama_client, situations_data, output_file_path, ids=None, iters=-1):
+def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=-1):
     
     prompt1 = """\
     Look carefully at this image and identify all objects and relationships present.
@@ -438,78 +438,8 @@ def streaming_frame_generation(ollama_client, situations_data, output_file_path,
 
     )
 
-    graph_gen_pipeline.consume(situations_data)
-
-
-def parallel_streaming_frames(ollama_client, output_file_path, 
-                            ids=None, iters=-1, batch_size=100):
-    import multiprocessing
-    import queue
-    from functools import partial
-    
-    num_processes = 4
-    situations_data = (situation_frames for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10))
-    # Create communication queues
-    input_queue = multiprocessing.Queue(maxsize=num_processes * 2)
-    output_queue = multiprocessing.Queue()
-
-    # Worker function
-    def worker(in_queue, out_queue):
-        while True:
-            try:
-                batch = in_queue.get(timeout=1)  # Timeout for clean exit
-                if batch is None:  # Poison pill
-                    break
-                    
-                # Process batch
-                worker_output = f"{output_file_path}_worker_{multiprocessing.current_process().pid}"
-                streaming_frame_generation(
-                    ollama_client,
-                    batch,
-                    worker_output,
-                    ids,
-                    iters
-                )
-                out_queue.put(worker_output)
-            except queue.Empty:
-                break
-
-    # Start workers
-    workers = []
-    for _ in range(num_processes):
-        p = multiprocessing.Process(
-            target=worker,
-            args=(input_queue, output_queue)
-        )
-        p.start()
-        workers.append(p)
-
-    # Producer - feed batches from generator
-    try:
-        current_batch = []
-        for item in situations_data:
-            current_batch.append(item)
-            if len(current_batch) >= batch_size:
-                input_queue.put(current_batch)
-                current_batch = []
-        
-        # Submit remaining items
-        if current_batch:
-            input_queue.put(current_batch)
-            
-    finally:
-        # Signal workers to stop
-        for _ in range(num_processes):
-            input_queue.put(None)
-        
-        # Wait for completion
-        for w in workers:
-            w.join()
-
-        # Optional: Collect results from output_queue if needed
-        results = []
-        while not output_queue.empty():
-            results.append(output_queue.get())
+    situations = (situation_frames for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10))
+    graph_gen_pipeline.consume(situations)
 
 if __name__ == "__main__":
     main()
