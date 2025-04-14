@@ -10,7 +10,7 @@ from pathlib import Path
 
 import batch_processor
 import prompt_formatters as pf
-from ollama_manager import OllamaRequestManager, STARPromptGenerator
+from ollama_manager import OllamaRequestManager, PromptDataset
 from STAR_utils.visualization_tools import vis_utils
 
 SEED = 13471225022025
@@ -152,14 +152,10 @@ def run_with_prompts(
     ids = None
     if ids_filepath:
         with open(ids_filepath, "r") as f:
-            ids = [json.loads(line)["qid"] for line in f.readlines()]
+            ids = [line.strip() for line in f.readlines()]
 
-    prompt_generator = STARPromptGenerator(questions_file_path=input_filepath)
-
-    # Generate prompts
-    prompts = list(
-        prompt_generator.generate(prompt_formatter=prompt_formatter, ids=ids)
-    )
+    dataset = PromptDataset(input_filepath, prompt_formatter, ids=ids)
+    prompts = [dataset[i] for i in range(len(dataset))]
 
     # Generate responses
     ollama_client.load_model()
@@ -256,6 +252,13 @@ def main():
         responses_file = args.responses_file
         prompt_types["judge"] = functools.partial(prompt_types["judge"], responses_file)
 
+    # Handle ids file
+    ids_file_path = args.ids_file
+    ids = None
+    if ids_file_path:
+        with open(ids_file_path, "r") as f:
+            ids = [line.strip() for line in f.readlines()]
+            
     if args.task == 'graph_gen':
         from pathlib import Path
         
@@ -277,17 +280,15 @@ def main():
                 }
 
         client = OllamaRequestManager(url, ollama_params)
-        streaming_frame_generation(client, args.output_file, iters=-1)
+        parallel_streaming_frames(client, args.output_file, ids=ids, iters=-1)
         return
     
     # Load the selected prompts
     load_func = prompt_types[args.prompt_type]
     system_prompt, prompt_formatter = load_func()
 
-    ids_file_path = args.ids_file
+    
     # Run with the selected configuration
-    
-    
     run_with_prompts(
         system_prompt=system_prompt,
         prompt_formatter=prompt_formatter,
@@ -299,7 +300,7 @@ def main():
     )
 
 
-def generate_frames(iters=-1, max_sample=10):
+def generate_frames(iters=-1, max_sample=10, ids=None):
 
     star_data = []
     val_path = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
@@ -309,6 +310,9 @@ def generate_frames(iters=-1, max_sample=10):
     raw_frame_dir = BASE_DIR / "data/datasets/action-genome/frames"
 
     for sample in star_data:
+        if ids and sample['question_id'] not in ids:
+            continue
+        
         frame_ids = sorted(list(sample['situations'].keys()))
         frame_ids = vis_utils.sample_frames(frame_ids, max_sample)
 
@@ -364,7 +368,7 @@ def frame_aggregator(stream):
             yield {**o1, "stsg": ''.join(agg)}
             return # Generator stops here
 
-def streaming_frame_generation(ollama_client, output_file_path, iters=-1):
+def streaming_frame_generation(ollama_client, situations_data, output_file_path, ids=None, iters=-1):
     
     prompt1 = """\
     Look carefully at this image and identify all objects and relationships present.
@@ -434,9 +438,78 @@ def streaming_frame_generation(ollama_client, output_file_path, iters=-1):
 
     )
 
-    situations = (situation_frames for situation_frames in generate_frames(iters=-1, max_sample=10))
-    graph_gen_pipeline.consume(situations)
+    graph_gen_pipeline.consume(situations_data)
 
+
+def parallel_streaming_frames(ollama_client, output_file_path, 
+                            ids=None, iters=-1, batch_size=100):
+    import multiprocessing
+    import queue
+    from functools import partial
+    
+    num_processes = 4
+    situations_data = (situation_frames for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10))
+    # Create communication queues
+    input_queue = multiprocessing.Queue(maxsize=num_processes * 2)
+    output_queue = multiprocessing.Queue()
+
+    # Worker function
+    def worker(in_queue, out_queue):
+        while True:
+            try:
+                batch = in_queue.get(timeout=1)  # Timeout for clean exit
+                if batch is None:  # Poison pill
+                    break
+                    
+                # Process batch
+                worker_output = f"{output_file_path}_worker_{multiprocessing.current_process().pid}"
+                streaming_frame_generation(
+                    ollama_client,
+                    batch,
+                    worker_output,
+                    ids,
+                    iters
+                )
+                out_queue.put(worker_output)
+            except queue.Empty:
+                break
+
+    # Start workers
+    workers = []
+    for _ in range(num_processes):
+        p = multiprocessing.Process(
+            target=worker,
+            args=(input_queue, output_queue)
+        )
+        p.start()
+        workers.append(p)
+
+    # Producer - feed batches from generator
+    try:
+        current_batch = []
+        for item in situations_data:
+            current_batch.append(item)
+            if len(current_batch) >= batch_size:
+                input_queue.put(current_batch)
+                current_batch = []
+        
+        # Submit remaining items
+        if current_batch:
+            input_queue.put(current_batch)
+            
+    finally:
+        # Signal workers to stop
+        for _ in range(num_processes):
+            input_queue.put(None)
+        
+        # Wait for completion
+        for w in workers:
+            w.join()
+
+        # Optional: Collect results from output_queue if needed
+        results = []
+        while not output_queue.empty():
+            results.append(output_queue.get())
 
 if __name__ == "__main__":
     main()
