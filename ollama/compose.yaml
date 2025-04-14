@@ -21,7 +21,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["3"]
+              device_ids: ["4"]
               capabilities: [gpu]
     cpuset: "20-23"
     restart: "no"

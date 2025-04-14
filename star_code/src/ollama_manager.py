@@ -1,9 +1,11 @@
 import json
 import logging
 import os
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import requests
+
+from torch.utils.data import Dataset
 
 import prompt_formatters as pf
 
@@ -160,6 +162,8 @@ class OllamaChatHandler(OllamaStreamHandler):
         return {"content": "".join(result["token_stream"]), "role": result["role"]}
 
 
+
+
 class STARPromptGenerator:
 
     def __init__(self, questions_file_path, stsg_file_path=None):
@@ -176,6 +180,29 @@ class STARPromptGenerator:
         self.stsg_file_path = stsg_file_path
 
 
+    def load_stsg_data(file_path):
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"STSG file not found: {file_path}")
+
+        with open(file_path, "r") as f:
+            try:
+                stsg_items = [json.loads(line) for line in f]
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in STSG file: {e}")
+
+        if not stsg_items:
+            return {}
+
+        # Determine the ID key dynamically
+        first_item = stsg_items[0]
+        id_key = "qid" if "qid" in first_item else "question_id"
+
+        return {
+            item.pop(id_key): item['stsg']
+            for item in stsg_items
+            if id_key in item and 'stsg' in item
+        }
+    
     def generate(self, prompt_formatter, ids=None, start=0, limit=None):
         """
         Args:
@@ -246,3 +273,236 @@ class STARPromptGenerator:
 
         except IOError as e:
             raise IOError("Error saving prompts") from e
+        
+
+class PromptDataset(Dataset):
+    def __init__(self, qa_file_path, prompt_formatter, stsg_file_path=None, ids=None, limit=None, stsg_buffer_size=1000):
+        if not os.path.exists(qa_file_path):
+            raise OSError(f"No such file or directory: '{qa_file_path}'")
+        self.qa_file_path = qa_file_path
+        
+        if stsg_file_path and not os.path.exists(stsg_file_path):
+            raise OSError(f"No such file or directory: '{stsg_file_path}'")
+        
+        self.prompt_formatter = prompt_formatter
+        self.stsg_file_path = stsg_file_path
+        
+        
+        self._stsg_index = None
+        self._stsg_buffer = OrderedDict()
+        self._stsg_file_handle = None
+        self.q_id_key = None
+        
+        # Load qa and build STSG index
+        self.qa = []
+        with open(self.qa_file_path, 'r') as f:
+            self.qa  = json.load(f)
+            
+        if len(self.qa) > 0:
+            self.q_id_key = 'qid' if 'qid' in self.qa[0] else 'question_id'
+        
+        if ids:
+            self.qa = {q for i, q in enumerate(self.qa) 
+                                if q[self.q_id_key] in ids and (limit is None or i < limit)}
+        if self.stsg_file_path:
+            self._build_stsg_index()
+
+            
+    def __len__(self):
+        return len(self.qa)
+    
+    def __getitem__(self, idx):
+        if idx >= len(self):
+            raise IndexError
+            
+        sample = self.qa[idx]
+        question_id = sample.get(self.q_id_key)
+        
+        # Get STSG data if available
+        stsg_data = {}
+        if self.stsg_file_path and question_id:
+            stsg_data = self._get_stsg_data(question_id)
+        
+        # Merge the question key-value pairs with
+        # the stsg (note the key-values pairs on the right take priority
+        # when there are keys in common, i.e. the stsg data on the right overwrites
+        # the stsg data on sample if there is any)
+        sample =  sample | stsg_data
+        prompt = self.prompt_formatter.format(sample)
+
+    def _build_stsg_index(self):
+        self._stsg_index = {}
+        id_key = None
+        first_line = True
+        try:
+            with open(self.stsg_file_path, "rb") as f:
+                while True:
+                    byte_offset = f.tell()
+                    line = f.readline()
+
+                    if not line:
+                        break
+
+                    try:
+                        item = json.loads(line)
+
+                        if first_line:
+                            if "qid" in item:
+                                id_key = "qid"
+                            elif "question_id" in item:
+                                id_key = "question_id"
+                            else:
+                                raise ValueError(
+                                    "STSG file lines must contain either 'qid' or 'question_id'"
+                                )
+                            first_line = False
+
+                        if id_key not in item:
+                            print(
+                                f"Warning: Line at offset {byte_offset} missing ID key '{id_key}'. Skipping."
+                            )
+                            continue
+
+                        self._stsg_index[item[id_key]] = byte_offset
+
+                    except json.JSONDecodeError:
+                        print(
+                            f"Warning: Unable to decode line at offset {byte_offset}. Skipping."
+                        )
+                        continue
+        except FileNotFoundError:
+            raise FileNotFoundError(f"STSG file not found during indexing: {self.stsg_file_path}")
+        except IOError as e:
+            raise IOError(f"Error reading STSG file during indexing: {e}") from e
+        
+    def _load_stsg_chunk(self, question_ids):
+        """Load a chunk of STSG data for the given question IDs."""
+        if not self._stsg_file_handle:
+            self._stsg_file_handle = open(self.stsg_file_path, 'r')
+        
+        # Clear buffer if it's too large
+        if len(self._stsg_buffer) > self.stsg_buffer_size * 2:
+            self._stsg_buffer.clear()
+
+        # Find positions we need to load
+        load_positions = {}
+        for qid in question_ids:
+            if qid in self._stsg_index and qid not in self._stsg_buffer:
+                load_positions[qid] = self._stsg_index[qid]
+
+        # Sort positions for sequential reads
+        sorted_positions = sorted(load_positions.items(), key=lambda x: x[1])
+
+        # Load in sorted order
+        for qid, pos in sorted_positions:
+            self._stsg_file_handle.seek(pos)
+            line = self._stsg_file_handle.readline()
+            try:
+                data = json.loads(line)
+                self._stsg_buffer[qid] = data.get('stsg', {})
+            except json.JSONDecodeError:
+                continue
+
+    def _get_stsg_data(self, question_id):
+        """Get STSG data for a question with buffered loading."""
+        if question_id in self._stsg_buffer:
+            return self._stsg_buffer[question_id]
+        
+        # Pre-load a chunk around this question
+        if question_id in self._stsg_index:
+            idx = list(self._stsg_index.keys()).index(question_id)
+            start = max(0, idx - self.stsg_buffer_size // 2)
+            end = min(len(self._stsg_index), idx + self.stsg_buffer_size // 2)
+            chunk_ids = list(self._stsg_index.keys())[start:end]
+            self._load_stsg_chunk(chunk_ids)
+        
+        # TODO: handle default value
+        if question_id not in self._stsg_buffer:
+            print(f"Warning: {question_id} has no STSG data, filling the default value 'No STSG data'")
+        return self._stsg_buffer.get(question_id, "No STSG data")
+class QuestionProcessor:
+
+    def __init__(self, stsg_buffer_size=1000):
+        self.stsg_buffer_size = stsg_buffer_size
+        self._stsg_index = None
+        self._stsg_buffer = OrderedDict()
+        self._stsg_file_handle = None
+
+    def _build_stsg_index(self, file_path):
+        self._stsg_index = {}
+        id_key = None
+        first_line = True
+        try:
+            with open(file_path, "rb") as f:
+                while True:
+                    byte_offset = f.tell()
+                    line = f.readline()
+
+                    if not line:
+                        break
+
+                    try:
+                        item = json.loads(line)
+
+                        if first_line:
+                            if "qid" in item:
+                                id_key = "qid"
+                            elif "question_id" in item:
+                                id_key = "question_id"
+                            else:
+                                raise ValueError(
+                                    "STSG file lines must contain either 'qid' or 'question_id'"
+                                )
+                            first_line = False
+
+                        if id_key not in item:
+                            print(
+                                f"Warning: Line at offset {byte_offset} missing ID key '{id_key}'. Skipping."
+                            )
+                            continue
+
+                        self._stsg_index[item[id_key]] = byte_offset
+
+                    except json.JSONDecodeError:
+                        print(
+                            f"Warning: Unable to decode line at offset {byte_offset}. Skipping."
+                        )
+                        continue
+        except FileNotFoundError:
+            raise FileNotFoundError(f"STSG file not found during indexing: {file_path}")
+        except IOError as e:
+            raise IOError(f"Error reading STSG file during indexing: {e}") from e
+
+    def _load_stsg_buffer(self, target_ids):
+        """Load a buffer of STSG items of the given target IDa."""
+        if not self._stsg_file_handle:
+            self._stsg_file_hanlde = open(self.stsg_file_path, "r")
+
+        # Clear buffer if it's getting to large
+        if len(self._stsg_buffer) > self.stsg_buffer_size * 2:
+            self._stsg_buffer.clear()
+
+        # Find all positions we need to load
+        load_index = {}
+        for id in target_ids:
+            if id in self._stsg_index and id not in self._stsg_buffer:
+                load_index[id] = self._stsg_index[id]
+
+        # Reorder based on the seek position in the file
+        sorted_index = sorted(load_index.items(), key=lambda x: x[1])
+
+        for id, pos in sorted_index:
+            self._stsg_file_handle.seek(pos)
+            line = self._stsg_file_handle.readline()
+
+            data = json.loads(line)
+            # TODO: Warn of NO STSG data
+            if "stsg" not in self._stsg_buffer[id]:
+                print(
+                    f"Warning: item {id} has no STSG Data. Using default value 'No STSG data'."
+                )
+            self._stsg_buffer[id] = data.get("stsg", "No STSG data")
+
+    def _get_stsg_data(self, question_id):
+        if question_id in self._stsg_buffer:
+            return self._stsg_buffer.pop(question_id)
