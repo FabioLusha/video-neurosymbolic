@@ -61,6 +61,33 @@ async def chat(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@scaffold_server.post("/api/timeout")
+async def generate(request: Request):
+    """Handle generation requests with streaming by default"""
+    try:
+        # Parse the request body as JSON
+        body = await request.json()
+        prompt = body.get("prompt")
+        logger.info(f"Received request with prompt:\n {prompt}")
+
+        # Streaming response by default
+        async def generate_words():
+            words = "Hi, I am alive".split()
+            for i, word in enumerate(words):
+                # Simulate timeout after second word
+                if i == 2:
+                    await asyncio.sleep(5)
+                    return
+                yield json.dumps({"response": f"{word} "}) + "\n"
+                await asyncio.sleep(0.2)  # Simulate delay between words
+
+        return StreamingResponse(generate_words(), media_type="application/x-ndjson")
+
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @scaffold_server.get("/health")
 async def health_check():
     """Simple health check endpoint"""

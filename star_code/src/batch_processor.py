@@ -4,6 +4,7 @@ import traceback
 from datetime import datetime
 
 import requests
+
 from ollama_manager import Result
 
 
@@ -43,9 +44,10 @@ class Pipeline:
         return result if result != [] else None
 
 
-def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
+def stream_request(
+    payload_gen, ollama_client, endpoint, consecutive_errors_thresh=10, **kwargs
+):
     consecutive_errors = 0
-    threshold = 10
 
     print(" Starting Response Generation ".center(80, "="))
     for i, sample in enumerate(payload_gen, 1):
@@ -74,9 +76,9 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
             # which also contains an attribute ['response'] with the
             # partial response
             consecutive_errors += 1
-            if consecutive_errors > threshold:
+            if consecutive_errors > consecutive_errors_thresh:
                 print(
-                    f"There have been more than {threshold} consecutive errors! Stopping the program!"
+                    f"There have been more than {consecutive_errors_thresh} consecutive errors! Stopping the program!"
                 )
                 raise ValueError(
                     f"There have been {consecutive_errors} conscutive errors!"
@@ -87,12 +89,14 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                 "id": id,
                 "client": ollama_client,
                 "error": e,
-                "response": getattr(e, 'response'),
+                "response": getattr(e, "response"),
                 # don't need the payload anymore because it is included in **sample
             }
 
 
-def stream_save(response_generator, response_formatter, output_file_path=None):
+def stream_save(
+    response_generator, response_formatter, output_file_path=None, log_file_path=None
+):
     start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
 
     if output_file_path:
@@ -116,10 +120,27 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
             output_dir, f"responses_{start_timestamp}.jsonl"
         )
 
-    error_file = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
+    if log_file_path:
+        # Create directory if it doesn't exist
+        if os.path.exists(log_file_path):
+            raise FileExistsError(f"The file {log_file_path} already exists!")
+
+        # Create directory if it doesn't exists
+        dir = os.path.dirname(log_file_path)
+        output_dir = dir if dir != "" else "outputs"
+        os.makedirs(dir, exist_ok=True)
+
+    else:
+        # Create logs directory if it doesn't exist
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Saving the response as JSON in jsonl format,
+        # where each json object is saved in one line
+        log_file_path = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
     print(f"Responses will be saved to: {output_file_path}")
-    print(f"Errors will be logged to: {error_file}")
+    print(f"Errors will be logged to: {log_file_path}")
 
     # Using line buffering
     with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
@@ -135,14 +156,12 @@ def stream_save(response_generator, response_formatter, output_file_path=None):
                 res_f.write(json.dumps(response_obj) + "\n")
                 res_f.flush()
             elif status == "error":
-                with open(error_file, "a", buffering=1, encoding="utf-8") as error_f:
+                with open(log_file_path, "a", buffering=1, encoding="utf-8") as error_f:
                     log_msg, response_file_msg = (
                         response_formatter.format_error_response(result)
                     )
 
-                    error_f.write(
-                        json.dumps(log_msg, indent=2, ensure_ascii=False) + "\n"
-                    )
+                    error_f.write(json.dumps(log_msg) + "\n")
                     error_f.flush()
 
                     res_f.write(json.dumps(response_file_msg) + "\n")
@@ -230,8 +249,9 @@ class GenerateResponseFormatter(ResponseFormatter):
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data["response"]
-
+        error = response_data["error"]
+        print("Errrrrrro incoming")
+        print(error)
         traceback_text = ""
         if hasattr(error, "__traceback__"):
             tb = error.__traceback__
@@ -284,7 +304,7 @@ class ChatResponseFormatter(ResponseFormatter):
         partial_error_response = getattr(error, "response", "")
 
         print(response_data.keys())
-        chat_history = response_data["message"]
+        chat_history = response_data["messages"]
         chat_history.append(
             {
                 "role": partial_error_response.get("role", "unk"),
@@ -373,3 +393,87 @@ class GeneratedGraphFormatter(ResponseFormatter):
         }
 
         return error_log, error_response_message
+
+
+# A class implementaion of the stream_save functionality if needed
+class StreamSaver:
+
+    def __init__(self, response_generator, response_formatter, output_file_path=None):
+        start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+
+        if output_file_path:
+            # Create directory if it doesn't exist
+            if os.path.exists(output_file_path):
+                raise FileExistsError(f"The file {output_file_path} already exists!")
+
+            # Create directory if it doesn't exists
+            dir = os.path.dirname(output_file_path)
+            output_dir = dir if dir != "" else "outputs"
+            os.makedirs(dir, exist_ok=True)
+
+        else:
+            # Create logs directory if it doesn't exist
+            output_dir = "outputs"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Saving the response as JSON in jsonl format,
+            # where each json object is saved in one line
+            output_file_path = os.path.join(
+                output_dir, f"responses_{start_timestamp}.jsonl"
+            )
+
+        error_file = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
+
+        print(f"Responses will be saved to: {output_file_path}")
+        print(f"Errors will be logged to: {error_file}")
+
+        self.response_generator = response_generator
+        self.response_formatter = response_formatter
+
+        self.output_file_path = output_file_path
+        self.error_file_path = error_file
+
+        self.res_f = None
+        self.error_f = None
+
+    def __enter__(self):
+        self.res_f = open(self.output_file_path, "w", buffering=1, encoding="utf-8")
+        self.error_f = open(self.error_file_path, "w", buffering=1, encoding="utf-8")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.error_f.close()
+        self.res_f.close()
+
+    def save_and_stream(self):
+        # Using line buffering
+        with self:
+            for i, result in enumerate(self.response_generator, 1):
+                status = result["status"]
+                id = result["id"]
+
+                if status == "ok":
+                    # Create response object
+                    response_obj = self.response_formatter.format_success_response(
+                        result
+                    )
+
+                    self.res_f.write(json.dumps(response_obj) + "\n")
+                    self.res_f.flush()
+                elif status == "error":
+                    log_msg, response_file_msg = (
+                        self.response_formatter.format_error_response(result)
+                    )
+
+                    self.error_f.write(json.dumps(log_msg) + "\n")
+                    self.error_f.flush()
+
+                    self.res_f.write(json.dumps(response_file_msg) + "\n")
+                    self.res_f.flush()
+
+                    print(
+                        f"Error at iteration {i}\n"
+                        f"Prompt id:{id}\n"
+                        "Look at the log file for specifics on the error"
+                    )
+
+                yield result

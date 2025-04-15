@@ -20,9 +20,9 @@ class TestPromptDataset(unittest.TestCase):
         # Create sample QA file
         cls.qa_file = os.path.join(cls.temp_dir.name, "qa.json")
         cls.qa_data = [
-            {"qid": "1", "question": "q1"},
-            {"qid": "5", "question": "q2"},
-            {"qid": "7", "question": "q3"},
+            {"qid": "1", "question": "q1", "stsg": "person1"},
+            {"qid": "5", "question": "q2", "stsg": "person2"},
+            {"qid": "7", "question": "q3", "stsg": "person3"},
         ]
         with open(cls.qa_file, "w") as f:
             json.dump(cls.qa_data, f)
@@ -68,6 +68,18 @@ class TestPromptDataset(unittest.TestCase):
         self.assertEqual("Q: q1 STSG: object1", sample["prompt"])
         # Should have merged STSG data
         self.assertEqual("1", sample["qid"])
+
+    def test_default_stsg(self):
+        """Test __getitem__ with STSG data"""
+        dataset = PromptDataset(self.qa_file, self.prompt_formatter)
+        self.assertEqual("Q: q1 STSG: person1", dataset[0]["prompt"])
+        self.assertEqual("1", dataset[0]["qid"])
+
+        self.assertEqual("Q: q2 STSG: person2", dataset[1]["prompt"])
+        self.assertEqual("5", dataset[1]["qid"])
+
+        self.assertEqual("Q: q3 STSG: person3", dataset[2]["prompt"])
+        self.assertEqual("7", dataset[2]["qid"])
 
     def test_filter_by_ids(self):
         """Test filtering by specific IDs"""
