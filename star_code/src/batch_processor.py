@@ -86,7 +86,8 @@ def stream_request(payload_gen, ollama_client, endpoint, **kwargs):
                 "status": "error",
                 "id": id,
                 "client": ollama_client,
-                "response": e,
+                "error": e,
+                "response": getattr(e, 'response'),
                 # don't need the payload anymore because it is included in **sample
             }
 
@@ -271,7 +272,7 @@ class ChatResponseFormatter(ResponseFormatter):
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data["response"]
+        error = response_data["error"]
 
         traceback_text = ""
         if hasattr(error, "__traceback__"):
@@ -332,7 +333,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data["response"]
+        error = response_data["error"]
 
         traceback_text = ""
         if hasattr(error, "__traceback__"):
