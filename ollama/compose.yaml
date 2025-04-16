@@ -10,6 +10,7 @@ services:
       - OLLAMA_HOST=0.0.0.0:11435
       - OLLAMA_LOG=debug
       - OLLAMA_DEBUG=1
+      - OLLAMA_NUM_PARALLEL=4
     user: "${UID-1142}:${GID-1142}"
     ports:  
       - "11435:11435"
@@ -21,9 +22,35 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["4"]
+              device_ids: ["0"]
               capabilities: [gpu]
-    cpuset: "20-23"
+    cpuset: "0-7"
+    restart: "no"
+    runtime: "nvidia"
+    networks:
+      - default
+
+  ollama_service2:
+    image: lusha/ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_LOG=debug
+      - OLLAMA_DEBUG=1
+      - OLLAMA_NUM_PARALLEL=4
+    user: "${UID-1142}:${GID-1142}"
+    ports:  
+      - "11434:11434"
+    volumes:
+      - /home/lusha/storage/ollama/ollama_models:/.ollama 
+    container_name: lusha_ollama2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    cpuset: "0-7"
     restart: "no"
     runtime: "nvidia"
     networks:
