@@ -3,7 +3,6 @@ import base64
 import functools
 import json
 import os
-import pathlib
 
 import re
 from pathlib import Path
@@ -28,7 +27,7 @@ MODELS = [
 BASE_DIR = Path(__file__).parent.parent 
 
 def load_open_qa_prompts():
-    system_prompt = _load_prompt_fromfile("data/system_prompt.txt")
+    system_prompt = _load_prompt_fromfile(BASE_DIR / "data/system_prompt.txt")
     prompt_format = "QUESTION: {question}\n" "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
     pformatter = pf.OpenEndedPrompt(prompt_format)
@@ -38,7 +37,7 @@ def load_open_qa_prompts():
 def load_mcq_prompts():
     # PROMPT FOR MULTI-CHOICE QA
     mcq_system_prompt = _load_prompt_fromfile(
-        "data/prompts/MCQ_system_prompt_v2_oneshot.txt"
+        BASE_DIR / "data/prompts/MCQ_system_prompt_v2_oneshot.txt"
     )
     mcq_pformat = """\
         Q: {question}
@@ -58,7 +57,7 @@ def load_mcq_prompts():
 
 def load_mcq_html_prompts():
     # PROMPT FOR MULTI-CHOICE QA WITH HTML TAGS
-    mcq_system_prompt = _load_prompt_fromfile("data/MCQ_system_prompt_v3.txt")
+    mcq_system_prompt = _load_prompt_fromfile(BASE_DIR / "data/MCQ_system_prompt_v3.txt")
     mcq_pformat = """\
         <STSG>\n{stsg}\n<\STSG>
         <Question>
@@ -78,11 +77,11 @@ def load_mcq_html_prompts():
 
 def load_mcq_zs_cot_prompts():
     sys_prompt = _load_prompt_fromfile(
-        "data/prompts/zero-shot-cot/MCQ_system_prompt_ZS_CoT.txt"
+        BASE_DIR / "data/prompts/zero-shot-cot/MCQ_system_prompt_ZS_CoT.txt"
     )
     user_prompt = _load_prompt_fromfile(
         # "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT.txt"
-        "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt"
+        BASE_DIR / "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt"
     )
 
     mcq_pformatter = pf.MCQPrompt(user_prompt)
@@ -93,7 +92,7 @@ def load_mcq_zs_cot_prompts():
 def load_bias_check_prompts():
     # PROMPTS FOR BIAS CHECK - I.E. QUESTION WITHOUT STSG
     mcq_system_prompt_bias = _load_prompt_fromfile(
-        "data/prompts/system_prompt_bias_check.txt"
+        BASE_DIR / "data/prompts/system_prompt_bias_check.txt"
     )
     mcq_bias_pformat = "Q: {question}\n" "{c1}\n{c2}\n{c3}\n{c4}\n" "A:"
     mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
@@ -102,8 +101,8 @@ def load_bias_check_prompts():
 
 
 def load_llm_as_judge_prompts(responses_filepath):
-    llm_judge_sys_prompt = _load_prompt_fromfile("data/prompts/LLM_judge_system_v2.txt")
-    llm_judge_usr_prompt = _load_prompt_fromfile("data/prompts/LLM_judge_user_v2.txt")
+    llm_judge_sys_prompt = _load_prompt_fromfile(BASE_DIR / "data/prompts/LLM_judge_system_v2.txt")
+    llm_judge_usr_prompt = _load_prompt_fromfile(BASE_DIR / "data/prompts/LLM_judge_user_v2.txt")
 
     judge_pformatter = pf.LlmAsJudgePrompt(llm_judge_usr_prompt, responses_filepath)
     return llm_judge_sys_prompt, judge_pformatter
@@ -146,25 +145,29 @@ def run_with_prompts(
 
     # Initialize the prompt generator with the appropriate file
     if not input_filepath:
-        input_filepath = "data/datasets/STAR_QA_and_stsg_val.json"  # Default to MCQ
+        input_filepath = BASE_DIR / "data/datasets/STAR_QA_and_stsg_val.json"  # Default to MCQ
 
     # Handle ids file
     ids = None
     if ids_filepath:
+        print(f"=== Loading file with ids: {ids_filepath}")
         with open(ids_filepath, "r") as f:
             ids = [line.strip() for line in f.readlines()]
+    else:
+        print(f"=== No ids file chosen")
 
+    print(f"=== Generating prompts from: {input_filepath}")
     dataset = PromptDataset(input_filepath, prompt_formatter, ids=ids)
     prompts = [dataset[i] for i in range(len(dataset))]
 
     # Generate responses
     ollama_client.load_model()
+    
     if mode == "generate":
         print("=== Mode: generate")
         batch_processor.batch_generate(
             ollama_client, prompts, output_file_path=output_filepath
         )
-
     elif mode == "chat":
         print("=== Mode: chat")
         reply = """\
@@ -242,9 +245,9 @@ def main():
     input_file = args.input_file
     if not input_file:
         if args.prompt_type in ["open_qa"]:
-            input_file = "data/datasets/STAR_question_and_stsg.json"
+            input_file = BASE_DIR / "data/datasets/STAR_question_and_stsg.json"
         else:
-            input_file = "data/datasets/STAR_QA_and_stsg_val.json"
+            input_file = BASE_DIR / "data/datasets/STAR_QA_and_stsg_val.json"
 
     # Special handling for judge prompt type
     responses_file = None
@@ -264,7 +267,7 @@ def main():
         
         url = os.environ.get("OLLAMA_URL", "http://lusha_ollama:11435")
 
-        sys_file_path = BASE_DIR / 'data' / 'prompts' / 'img_captioning/system_prompt.txt'
+        sys_file_path = BASE_DIR / 'data/prompts/img_captioning/system_prompt.txt'
         
         sys_prompt = _load_prompt_fromfile(sys_file_path)
         ollama_params={
@@ -308,11 +311,12 @@ def generate_frames(iters=-1, max_sample=10, ids=None):
         star_data = json.load(in_file)
 
     raw_frame_dir = BASE_DIR / "data/datasets/action-genome/frames"
-
-    for sample in star_data:
-        if ids and sample['question_id'] not in ids:
-            continue
+    
+    if ids:
+        id_to_dict = {d['question_id']: d for d in star_data}
+        star_data = [id_to_dict[id] for id in ids]
         
+    for sample in star_data:       
         frame_ids = sorted(list(sample['situations'].keys()))
         frame_ids = vis_utils.sample_frames(frame_ids, max_sample)
 
@@ -364,7 +368,7 @@ def frame_aggregator(stream):
                 agg = []
 
             o1 = o2
-        except StopIteration:
+        except StopIteration | TypeError:
             yield {**o1, "stsg": ''.join(agg)}
             return # Generator stops here
 
@@ -430,6 +434,8 @@ def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=
         payload_gen,
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, endpoint='chat'),
         lambda stream: bp.auto_reply_gen(stream, prompt2),
+        # check the response is ok before passing to frame_extraction,
+        lambda stream: (o for o in stream if o['status'] == 'ok'),
         lambda stream: ({**stream_obj, 'sg': extract_frame_description(stream_obj['response']['content'])} for stream_obj in stream),
         lambda stream: frame_aggregator(stream),
         lambda stream: bp.stream_save(
