@@ -223,6 +223,7 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
         # the first generator converts the prompt to the right format
         payload_gen,
         lambda payload_gen: stream_request(payload_gen, ollama_client, "chat"),
+        lambda stream: (o for o in stream if o['status'] == 'ok'),
         lambda resp_gen: auto_reply_gen(resp_gen, reply),
         lambda resp_gen: stream_save(
             resp_gen, ChatResponseFormatter(), output_file_path
