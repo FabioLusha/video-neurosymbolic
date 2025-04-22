@@ -39,7 +39,7 @@ gensim
 
 networkx
 packaging
-
+graphviz==0.20.3
 
 regex
 requests
