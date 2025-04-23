@@ -17,83 +17,13 @@ services:
     command: [
       '-u', 
       'star_code/src/main.py', 
-      '--task', 'graph_gen',
-      '--model', 'gemma3:4b', 
-      '--prompt-type', 'mcq_zs_cot', 
-      '--mode', 'chat',
-      '--ids-file', 'star_code/src/val1_rem_ids.txt',
-      '--output-file', 'star_code/outputs/genframes_val1_part2.jsonl']
-    container_name: lusha_req_manager
-    user: "${UID-1142}:${GID-1142}"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 0
-    volumes:
-      - /home/lusha/storage:/home/lusha
-      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
-      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
-      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
-      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
-    cpuset: "20-23"
-    networks:
-      - default
-
-  req_manager2:
-    environment:
-      - OLLAMA_URL=http://lusha_ollama2:11434
-      - PYTHONUNBUFFERED=1
-    stdin_open: true  # Keep stdin open
-    tty: true        # Allocate a pseudo-TTY
-    image: lusha/pydev
-    entrypoint: ['python']
-    command: [
-      '-u', 
-      'star_code/src/main.py', 
-      '--task', 'graph_gen',
-      '--model', 'gemma3:4b', 
-      '--prompt-type', 'mcq_zs_cot', 
-      '--mode', 'chat',
-      '--ids-file', 'star_code/src/val2_rem_ids.txt',
-      '--output-file', 'star_code/outputs/genframes_val2_part2.jsonl']
-    container_name: lusha_req_manager2
-    user: "${UID-1142}:${GID-1142}"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 0
-    volumes:
-      - /home/lusha/storage:/home/lusha
-      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
-      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
-      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
-      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
-    cpuset: "20-23"
-    networks:
-      - default
-
-  resp_generator:
-    environment:
-      - OLLAMA_URL=http://lusha_ollama2:11434
-      - PYTHONUNBUFFERED=1
-    stdin_open: true  # Keep stdin open
-    tty: true        # Allocate a pseudo-TTY
-    image: lusha/pydev
-    entrypoint: ['python']
-    command: [
-      '-u', 
-      'star_code/src/main.py', 
       '--task', 'graph_understanding',
-      '--model', 'gemma3:4b', 
+      '--model', 'gemma3:27b', 
       '--prompt-type', 'mcq_zs_cot', 
-      '--input-file', 'star_code/data/datasets/STAR_QA_and_gen_stsg_p1.json',
       '--mode', 'chat',
-      '--output-file', 'star_code/outputs/responses_to_genframes_gemma3:4b_1604_p1.jsonl']
-    container_name: lusha_response_generator
+      #'--ids-file', 'star_code/src/val1_rem_ids.txt',
+      '--output-file', 'star_code/outputs/responses_gemma3:27b_20250423_10:35:99.jsonl']
+    container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
     deploy:
       resources:
