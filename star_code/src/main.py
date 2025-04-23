@@ -22,6 +22,7 @@ MODELS = [
     "phi3:3.8b",
     "gemma3:4b",
     "gemma3:12b",
+    "gemma3:27b",
 ]
 
 BASE_DIR = Path(__file__).parent.parent 
