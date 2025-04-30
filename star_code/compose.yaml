@@ -17,12 +17,12 @@ services:
     command: [
       '-u', 
       'star_code/src/main.py', 
-      '--task', 'graph_understanding',
-      '--model', 'gemma3:27b', 
-      '--prompt-type', 'mcq_zs_cot', 
+      '--task', 'vqa',
+      '--model', 'gemma3:4b', 
+      '--prompt-type', 'vqa', 
       '--mode', 'chat',
-      #'--ids-file', 'star_code/src/val1_rem_ids.txt',
-      '--output-file', 'star_code/outputs/responses_gemma3:27b_20250423_10:35:99.jsonl']
+      '--ids-file', 'star_code/src/ids_with_ans.txt',
+      '--output-file', 'star_code/outputs/responses_gemma3:4b_VQA_20250430_22:52:99.jsonl']
     container_name: lusha_req_manager
     user: "${UID-1142}:${GID-1142}"
     deploy:

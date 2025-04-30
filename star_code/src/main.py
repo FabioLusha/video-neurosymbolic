@@ -108,6 +108,33 @@ def load_llm_as_judge_prompts(responses_filepath):
     judge_pformatter = pf.LlmAsJudgePrompt(llm_judge_usr_prompt, responses_filepath)
     return llm_judge_sys_prompt, judge_pformatter
 
+def load_vqa_prompts():
+    user_prompt = '''\
+    You will receive a sequence of images and a question related to them. Analyze the images in the order they are presented,\
+    extract relevant details, and identify any patterns, changes, or relationships between them. Use this information to provide\
+    a choose one of the presented alternatives
+
+    Instructions:
+    - Describe each image in the sequence briefly but meaningfully.
+    - Note any important transitions or developments between consecutive images.
+    - Combine observations to infer the overall context or narrative.
+    - Answer the question based on your analysis, ensuring your response is grounded in the visual evidence.
+    - Read the question and reason about the answer step by step.
+    - In your answer include key events or relationships that help you in determine the correct answer.
+    - Be careful to reproduce the chosen alternative as it is presented.
+
+    Q: {question}
+    <Alternatives>
+    A. {c1}
+    B. {c2}
+    C. {c3}
+    D. {c4}
+    </Alternatives>\
+    '''
+   
+    mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(user_prompt)
+
+    return None, mcq_bias_pfromatter
 
 def _load_prompt_fromfile(filename):
     try:
@@ -182,7 +209,7 @@ def run_with_prompts(
         Do not abbreviate or shorten the answer. For example, if the correct answer is "A. the laptop", your response 
         should be {"answer": "A. the laptop"}, not {"answer": "laptop"} or {"answer": "A"}.\
         """
-        if args.task == 'video-answering':
+        if args.task == 'vqa':
             stream_vqa(
                 ollama_client, prompts, ids, reply, output_filepath=output_filepath
             )
@@ -201,10 +228,12 @@ def main():
         "mcq_zs_cot": load_mcq_zs_cot_prompts,
         "bias_check": load_bias_check_prompts,
         "judge": load_llm_as_judge_prompts,
+        "vqa": load_vqa_prompts
     }
 
     task_types = {
         "graph_gen": 0,
+        "vqa": 0,
         "graph_understanding": 0
     }
     # Set up argument parser
@@ -291,7 +320,7 @@ def main():
         client = OllamaRequestManager(url, ollama_params)
         streaming_frame_generation(client, args.output_file, ids=ids, iters=-1)
         return
-    
+
     # Load the selected prompts
     load_func = prompt_types[args.prompt_type]
     system_prompt, prompt_formatter = load_func()
@@ -456,20 +485,21 @@ def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=
     return
 
 def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
-    def payload_gen(situations, prompts):
-        prompts = {p['qid']: p['prompt'] for p in prompts}
+    
+    def payload_gen(situations):
+        prompts_dict = {p['qid']: p['prompt'] for p in prompts}
         for situation in situations:
             frame_encodings = [frame['encoding'] for frame in situation]
                 
             req_obj = {
-                "qid": situation["question_id"],
+                "qid": situation[0]["question_id"], # situation is list of [{question_id, frame_id, encoding}]
                 "payload": {
                     **ollama_client.ollama_params,
                     "messages": [
                         {
                             "role": "user",
-                            "content": prompts[situation["qusetion_id"]],
-                            "images": [frame_encodings],
+                            "content": prompts_dict[situation[0]["question_id"]], 
+                            "images": frame_encodings,
                         }
                     ],
                 },
