@@ -119,6 +119,7 @@ def _load_prompt_fromfile(filename):
 
 
 def run_with_prompts(
+    args,
     system_prompt,
     prompt_formatter,
     model_name,
@@ -181,10 +182,14 @@ def run_with_prompts(
         Do not abbreviate or shorten the answer. For example, if the correct answer is "A. the laptop", your response 
         should be {"answer": "A. the laptop"}, not {"answer": "laptop"} or {"answer": "A"}.\
         """
-
-        batch_processor.batch_automatic_chat_reply(
-            ollama_client, prompts, reply, output_file_path=output_filepath
-        )
+        if args.task == 'video-answering':
+            stream_vqa(
+                ollama_client, prompts, ids, reply, output_filepath=output_filepath
+            )
+        else:    
+            batch_processor.batch_automatic_chat_reply(
+                ollama_client, prompts, reply, output_file_path=output_filepath
+            )
 
 
 def main():
@@ -294,6 +299,7 @@ def main():
     
     # Run with the selected configuration
     run_with_prompts(
+        args=args,
         system_prompt=system_prompt,
         prompt_formatter=prompt_formatter,
         model_name=args.model,
@@ -447,7 +453,46 @@ def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=
 
     situations = (situation_frames for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10))
     graph_gen_pipeline.consume(situations)
+    return
 
+def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
+    def payload_gen(situations, prompts):
+        prompts = {p['qid']: p['prompt'] for p in prompts}
+        for situation in situations:
+            frame_encodings = [frame['encoding'] for frame in situation]
+                
+            req_obj = {
+                "qid": situation["question_id"],
+                "payload": {
+                    **ollama_client.ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompts[situation["qusetion_id"]],
+                            "images": [frame_encodings],
+                        }
+                    ],
+                },
+            }
+            
+            yield req_obj
+    
+    bp = batch_processor
+    pipe = bp.Pipeline(
+        # the first generator converts the prompt to the right format
+        payload_gen,
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
+        lambda stream: (o for o in stream if o['status'] == 'ok'),
+        lambda resp_gen: bp.auto_reply_gen(resp_gen, reply),
+        lambda resp_gen: bp.stream_save(
+            resp_gen, bp.ChatResponseFormatter(), output_filepath
+        ),
+    )
+    
+    situations = (situation_frames for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10))
+    pipe.consume(situations)
+    return
+                    
 if __name__ == "__main__":
     main()
 
