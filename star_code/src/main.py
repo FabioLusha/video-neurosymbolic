@@ -232,16 +232,16 @@ def main():
     }
 
     task_types = {
-        "graph_gen": 0,
+        "graph-gen": 0,
         "vqa": 0,
-        "graph_understanding": 0
+        "graph-understanding": 0
     }
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Run LLM with different prompt types")
     parser.add_argument(
         "--task",
         choices=task_types.keys(),
-        default="graph_understanding",
+        default="graph-understanding",
         help="Choose the task to be performed",
     )
     
@@ -297,7 +297,7 @@ def main():
         with open(ids_file_path, "r") as f:
             ids = [line.strip() for line in f.readlines()]
             
-    if args.task == 'graph_gen':
+    if args.task == 'graph-gen':
         from pathlib import Path
         
         url = os.environ.get("OLLAMA_URL", "http://lusha_ollama:11435")
@@ -306,7 +306,7 @@ def main():
         
         sys_prompt = _load_prompt_fromfile(sys_file_path)
         ollama_params={
-                    "model": "gemma3:4b",
+                    "model": args.model,
                     "system": sys_prompt,
                     "stream": True,
                     "options": {

@@ -40,3 +40,108 @@ services:
     cpuset: "0-7"
     networks:
       - default
+  
+  graph_understanding:
+    environment:
+      - OLLAMA_URL=http://lusha_ollama:11435
+      - PYTHONUNBUFFERED=1
+    stdin_open: true  # Keep stdin open
+    tty: true        # Allocate a pseudo-TTY
+    image: lusha/pydev
+    entrypoint: ['python']
+    command: [
+      '-u', 
+      'star_code/src/main.py', 
+      '--task', 'graph_understanding',
+      '--model', 'gemma3:4b', 
+      '--prompt-type', 'mcq_zs_cot', 
+      '--mode', 'chat',
+      '--input-file', 'star_code/data/datasets/STAR_QA_and_gen_stsg_p2.json',
+      '--output-file', 'star_code/outputs/responses_to_genframes_gemma3:4b_20250501_10:05:99.jsonl']
+    container_name: lusha_stsg_qa
+    user: "${UID-1142}:${GID-1142}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+              count: 0
+    volumes:
+      - /home/lusha/storage:/home/lusha
+      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
+      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
+      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
+    cpuset: "0-7"
+    networks:
+      - default
+
+  graph_generation:
+    environment:
+      - OLLAMA_URL=http://lusha_ollama:11435
+      - PYTHONUNBUFFERED=1
+    stdin_open: true  # Keep stdin open
+    tty: true        # Allocate a pseudo-TTY
+    image: lusha/pydev
+    entrypoint: ['python']
+    command: [
+      '-u', 
+      'star_code/src/main.py', 
+      '--task', 'graph-gen',
+      '--model', 'gemma3:4b',
+      '--prompt-type', 'mcq_zs_cot', 
+      '--mode', 'chat',
+      '--ids-file', 'star_code/src/rem_val1_ids.txt',
+      '--output-file', 'star_code/outputs/genframes_rem_val1_gemma3:4b_20250501_10:16:99.jsonl']
+    container_name: lusha_stsg_gen
+    user: "${UID-1142}:${GID-1142}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+              count: 0
+    volumes:
+      - /home/lusha/storage:/home/lusha
+      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
+      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
+      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
+    cpuset: "0-7"
+    networks:
+      - default
+
+  graph_generation2:
+    environment:
+      - OLLAMA_URL=http://lusha_ollama2:11434
+      - PYTHONUNBUFFERED=1
+    stdin_open: true  # Keep stdin open
+    tty: true        # Allocate a pseudo-TTY
+    image: lusha/pydev
+    entrypoint: ['python']
+    command: [
+      '-u', 
+      'star_code/src/main.py', 
+      '--task', 'graph-gen',
+      '--model', 'gemma3:4b',
+      '--prompt-type', 'mcq_zs_cot', 
+      '--mode', 'chat',
+      '--ids-file', 'star_code/src/rem_val2_ids.txt',
+      '--output-file', 'star_code/outputs/genframes_rem_val2_gemma3:4b_20250501_10:16:99.jsonl']
+    container_name: lusha_stsg_gen2
+    user: "${UID-1142}:${GID-1142}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+              count: 0
+    volumes:
+      - /home/lusha/storage:/home/lusha
+      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
+      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
+      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
+    cpuset: "0-7"
+    networks:
+      - default
