@@ -21,6 +21,8 @@ MODELS = [
     "deepseek-r1:7b",
     "phi3:3.8b",
     "gemma3:4b",
+    "gemma3:4b-it-q4_K_M", #instruction tuned
+    "gemma3:4b-it-qat", #it quantization aware training
     "gemma3:12b",
     "gemma3:27b",
 ]
@@ -109,29 +111,7 @@ def load_llm_as_judge_prompts(responses_filepath):
     return llm_judge_sys_prompt, judge_pformatter
 
 def load_vqa_prompts():
-    user_prompt = '''\
-    You will receive a sequence of images and a question related to them. Analyze the images in the order they are presented,\
-    extract relevant details, and identify any patterns, changes, or relationships between them. Use this information to provide\
-    a choose one of the presented alternatives
-
-    Instructions:
-    - Describe each image in the sequence briefly but meaningfully.
-    - Note any important transitions or developments between consecutive images.
-    - Combine observations to infer the overall context or narrative.
-    - Answer the question based on your analysis, ensuring your response is grounded in the visual evidence.
-    - Read the question and reason about the answer step by step.
-    - In your answer include key events or relationships that help you in determine the correct answer.
-    - Be careful to reproduce the chosen alternative as it is presented.
-
-    Q: {question}
-    <Alternatives>
-    A. {c1}
-    B. {c2}
-    C. {c3}
-    D. {c4}
-    </Alternatives>\
-    '''
-   
+    user_prompt = _load_prompt_fromfile(BASE_DIR / "data/prompts/img_answer/user_prompt.txt")
     mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(user_prompt)
 
     return None, mcq_bias_pfromatter
