@@ -280,6 +280,11 @@ class GenerateResponseFormatter(ResponseFormatter):
 class ChatResponseFormatter(ResponseFormatter):
     def format_success_response(self, response_data):
         chat_history = response_data["payload"]["messages"]
+        
+        for message in chat_history:
+            if ("images" in message) and len(message["images"]) > 1:
+                # remove images from payload to save space
+                message.pop("images")
 
         chat_history.append(
             {
@@ -287,6 +292,7 @@ class ChatResponseFormatter(ResponseFormatter):
                 "content": response_data["response"].get("content", ""),
             }
         )
+        
 
         success_response = {"qid": response_data["id"], "chat_history": chat_history}
 
