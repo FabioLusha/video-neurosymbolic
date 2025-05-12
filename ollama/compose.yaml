@@ -10,7 +10,7 @@ services:
       - OLLAMA_HOST=0.0.0.0:11435
       - OLLAMA_LOG=debug
       - OLLAMA_DEBUG=1
-      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_NUM_PARALLEL=2
     user: "${UID-1142}:${GID-1142}"
     ports:  
       - "11435:11435"
@@ -22,7 +22,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              device_ids: ["4"]
               capabilities: [gpu]
     cpuset: "0-7"
     restart: "no"
@@ -48,7 +48,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["4"]
               capabilities: [gpu]
     cpuset: "0-7"
     restart: "no"
