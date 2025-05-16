@@ -405,7 +405,7 @@ def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=
     """
 
     prompt2 = """\
-    Thank you. Now organize the objects and relationships you identified into a formal scene graph using this format:
+    Now organize the objects and relationships you identified into a formal scene graph using this format:
     object1 ---- relationship ---- object2
     
     The list of relationship predicates should be introduced by the tag <scene_graph> and terminated by the tag </scene_graph>
