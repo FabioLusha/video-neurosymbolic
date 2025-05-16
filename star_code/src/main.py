@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).parent.parent
 
 
 def load_open_qa_prompts():
-    system_prompt = _load_prompt_fromfile(BASE_DIR / "data/system_prompt.txt")
+    system_prompt = _load_prompt_fromfile(BASE_DIR / "data/prompts/system_prompt.txt")
     prompt_format = "QUESTION: {question}\n" "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
     pformatter = pf.OpenEndedPrompt(prompt_format)
@@ -61,7 +61,7 @@ def load_mcq_prompts():
 def load_mcq_html_prompts():
     # PROMPT FOR MULTI-CHOICE QA WITH HTML TAGS
     mcq_system_prompt = _load_prompt_fromfile(
-        BASE_DIR / "data/MCQ_system_prompt_v3.txt"
+        BASE_DIR / "data/promtps/MCQ_system_prompt_v3.txt"
     )
     mcq_pformat = """\
         <STSG>\n{stsg}\n<\STSG>
@@ -187,7 +187,7 @@ def run_with_prompts(
         print("=== No ids file chosen")
 
     print(f"=== Generating prompts from: {input_filepath}")
-    dataset = PromptDataset(input_filepath, prompt_formatter, ids=ids)
+    dataset = PromptDataset(input_filepath, prompt_formatter, stsg_file_path=args.stsg_file, ids=ids)
     prompts = [dataset[i] for i in range(len(dataset))]
 
     # Generate responses
@@ -246,15 +246,24 @@ def main():
         help="Which model to use",
     )
     parser.add_argument(
-        "--input-file", help="Input dataset file path (defaults based on prompt type)"
+        "--input-file",
+        help="Input dataset file path (defaults based on prompt type)"
     )
-    parser.add_argument("--output-file", help="file path where to save the response)")
+    parser.add_argument(
+        "--stsg-file",
+        help="File with the spatio-temporal scene graphs if these are not included in the main dataset"
+    )
+    parser.add_argument(
+        "--output-file",
+        help="file path where to save the response)"
+    )
     parser.add_argument(
         '--ids-file',
         help='Path to a file containing question IDs to process (one ID per line)'
     )
     parser.add_argument(
-        "--responses-file", help="File with the responses to be evaluated by the judge"
+        "--responses-file",
+        help="File with the responses to be evaluated by the judge"
     )
     parser.add_argument(
         "--mode",
@@ -263,7 +272,7 @@ def main():
     )
     parser.add_argument(
         "--reply-file",
-        help="Where to load the prompt for the automatic reply when run in chat mode",
+        help="File with the text for the automatic reply when run in chat mode",
     )
 
     args = parser.parse_args()
