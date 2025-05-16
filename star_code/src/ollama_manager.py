@@ -171,48 +171,59 @@ class PromptDataset(Dataset):
         stsg_file_path=None,
         ids=None,
         limit=None,
-        stsg_buffer_size=1000,
     ):
         if not os.path.exists(qa_file_path):
             raise OSError(f"No such file or directory: '{qa_file_path}'")
         self.qa_file_path = qa_file_path
-
-        if stsg_file_path and not os.path.exists(stsg_file_path):
-            raise OSError(f"No such file or directory: '{stsg_file_path}'")
         self.stsg_file_path = stsg_file_path
-
         self.prompt_formatter = prompt_formatter
-        self._stsg_index = None
-        self._stsg_buffer = OrderedDict()
-        self._stsg_buffer_size = 1000
-        self._stsg_file_handle = None
-        self.q_id_key = None
 
-        # Load qa and build STSG index
-        self.qa = []
-        ext = os.path.splitext(self.qa_file_path)[1].lower()
-        with open(self.qa_file_path, "r") as f:
-            # Check if file has a .json extension
-            if ext == ".json":
-                self.qa = json.load(f)
-            elif (ext == ".jsonl") or (ext == ".ndjson"):
-                self.qa = [json.loads(line) for line in f.readlines()]
-            else:
-                raise IOError(
-                    f"{self.qa_file_path} must be either a JSON or JSONL file."
-                )
-
+        # Load QA data
+        self.qa = self._load_qa_file()
+        
+        # Get question ID key (auto-detect between 'qid' and 'question_id')
         if len(self.qa) > 0:
             self.q_id_key = "qid" if "qid" in self.qa[0] else "question_id"
-
+        
+        # Filter by IDs if provided
         if ids:
-            self.qa = [
-                q
-                for i, q in enumerate(self.qa)
-                if q[self.q_id_key] in ids and (limit is None or i < limit)
-            ]
+            self.qa = [q for q in self.qa if q[self.q_id_key] in ids]
+        
+        # Apply limit if provided
+        if limit:
+            self.qa = self.qa[:limit]
+        
+        # Load STSG data (video_id -> stsg mapping)
+        self.stsgs = {}
         if self.stsg_file_path:
-            self._build_stsg_index()
+            self._load_stsg_data()
+
+    def _load_qa_file(self):
+        """Load QA data from JSON or JSONL file."""
+        ext = os.path.splitext(self.qa_file_path)[1].lower()
+        with open(self.qa_file_path, "r") as f:
+            if ext == ".json":
+                return json.load(f)
+            elif ext in (".jsonl", ".ndjson"):
+                return [json.loads(line) for line in f]
+            else:
+                raise IOError(f"{self.qa_file_path} must be either JSON or JSONL")
+
+    def _load_stsg_data(self):
+        """Load all STSG data into memory (video_id -> stsg dict)."""
+        if not os.path.exists(self.stsg_file_path):
+            raise OSError(f"STSG file not found: {self.stsg_file_path}")
+        
+        with open(self.stsg_file_path, "r") as f:
+            for line in f:
+                try:
+                    item = json.loads(line)
+                    video_id = item.get("video_id")
+                    stsg = item.get("stsg")
+                    if video_id is not None and stsg is not None:
+                        self.stsgs[video_id] = stsg
+                except json.JSONDecodeError:
+                    continue
 
     def __len__(self):
         return len(self.qa)
@@ -223,123 +234,14 @@ class PromptDataset(Dataset):
 
         sample = self.qa[idx]
         question_id = sample.get(self.q_id_key)
-
-        # Get STSG data if available
-        stsg_data = {}
-        if self.stsg_file_path and question_id:
-            # TODO: revert to simple access, the buffer needs attention
-            with open(self.stsg_file_path) as f:
-                f.seek(self._stsg_index[question_id])
-                line = f.readline()
-                stsg_data = json.loads(line)
-
-            # stsg_data = self._get_stsg_data(question_id)
-
-        # Merge the question key-value pairs with
-        # the stsg (note the key-values pairs on the right take priority
-        # when there are keys in common, i.e. the stsg data on the right overwrites
-        # the stsg data on sample if there is any)
-        sample = {**sample, **stsg_data}
+        video_id = sample.get("video_id")
+        
+        # Add STSG to sample if available
+        if video_id and video_id in self.stsgs:
+            sample["stsg"] = self.stsgs[video_id]
+        
         prompt = self.prompt_formatter.format(sample)
-
-        return {"qid": question_id, "prompt": prompt}
-
-    def _build_stsg_index(self):
-        self._stsg_index = {}
-        id_key = None
-        first_line = True
-        try:
-            with open(self.stsg_file_path, "rb") as f:
-                while True:
-                    byte_offset = f.tell()
-                    line = f.readline()
-
-                    if not line:
-                        break
-
-                    try:
-                        item = json.loads(line)
-
-                        if first_line:
-                            if "qid" in item:
-                                id_key = "qid"
-                            elif "question_id" in item:
-                                id_key = "question_id"
-                            else:
-                                raise ValueError(
-                                    "STSG file lines must contain either 'qid' or 'question_id'"
-                                )
-                            first_line = False
-
-                        if id_key not in item:
-                            print(
-                                f"Warning: Line at offset {byte_offset} missing ID key '{id_key}'. Skipping."
-                            )
-                            continue
-
-                        self._stsg_index[item[id_key]] = byte_offset
-
-                    except json.JSONDecodeError:
-                        print(
-                            f"Warning: Unable to decode line at offset {byte_offset}. Skipping."
-                        )
-                        continue
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"STSG file not found during indexing: {self.stsg_file_path}"
-            )
-        except IOError as e:
-            raise IOError(f"Error reading STSG file during indexing: {e}") from e
-
-    def _load_stsg_chunk(self, question_ids):
-        """Load a chunk of STSG data for the given question IDs."""
-        if not self._stsg_file_handle:
-            self._stsg_file_handle = open(self.stsg_file_path, "r")
-
-        # Clear buffer if it's too large
-        if len(self._stsg_buffer) > self._stsg_buffer_size * 2:
-            self._stsg_buffer.clear()
-
-        # Find positions we need to load
-        load_positions = {}
-        for qid in question_ids:
-            if qid in self._stsg_index and qid not in self._stsg_buffer:
-                load_positions[qid] = self._stsg_index[qid]
-
-        # Sort positions for sequential reads
-        sorted_positions = sorted(load_positions.items(), key=lambda x: x[1])
-
-        # Load in sorted order
-        for qid, pos in sorted_positions:
-            self._stsg_file_handle.seek(pos)
-            line = self._stsg_file_handle.readline()
-            try:
-                data = json.loads(line)
-                self._stsg_buffer[qid] = {"stsg": data.get("stsg", "No STSG data!")}
-            except json.JSONDecodeError:
-                continue
-
-    def _get_stsg_data(self, question_id):
-        """Get STSG data for a question with buffered loading."""
-        if question_id in self._stsg_buffer:
-            return self._stsg_buffer[question_id]
-
-        # Pre-load a chunk around this question
-        if question_id in self._stsg_index:
-            idx = list(self._stsg_index.keys()).index(question_id)
-            start = max(0, idx - self._stsg_buffer_size // 2)
-            end = min(len(self._stsg_index), idx + self._stsg_buffer_size // 2)
-            chunk_ids = list(self._stsg_index.keys())[start:end]
-            self._load_stsg_chunk(chunk_ids)
-
-        # TODO: handle default value
-        if question_id not in self._stsg_buffer:
-            print(
-                f"Warning: {question_id} has no STSG data, filling the default value 'No STSG data'"
-            )
-        return self._stsg_buffer.get(question_id, "No STSG data")
-
-    def __del__(self):
-        """Clean up resources."""
-        if hasattr(self, "_stsg_file_handle") and self._stsg_file_handle:
-            self._stsg_file_handle.close()
+        return {
+            "qid": question_id,
+            "prompt": prompt,
+        }
