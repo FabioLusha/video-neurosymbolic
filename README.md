@@ -1,3 +1,149 @@
-# This is the repository for the content of my thesis - Video-Neurosymbolic
+# STAR Ollama Toolkit
 
+A comprehensive toolkit for generating and understanding spatio-temporal scene graphs (STSG) using Ollama-powered language models.
 
+## Overview
+
+This toolkit consists of two complementary modules:
+
+1. **Graph Generation Module**: Extracts frames from videos and generates spatio-temporal scene graphs using vision-language models.
+2. **Graph Understanding Module**: Processes existing scene graphs to answer questions and perform reasoning tasks.
+
+Both modules use pre-configured prompts tailored for their specific tasks to ensure consistent model behavior.
+
+## Requirements
+
+- Python 3.6+
+- Ollama running locally or on a server
+- ffmpeg (for video processing in the Graph Generation module)
+- Required Python packages (install via `pip install -r requirements.txt`):
+  - requests
+  - pathlib
+  - argparse
+
+## Graph Generation Module
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `--model` | **(Required)** Ollama model to use for image captioning |
+| `--output-file` | **(Required)** Path to save the generated scene graph descriptions |
+| `--video-dir` | **(Required)** Directory containing the videos to process |
+| `--ids-file` | Path to a file containing video IDs to process (one ID per line) |
+| `--max-samples` | Maximum number of frames to sample per video (default: 10) |
+| `--sys-prompt` | Path to text file containing system prompt |
+| `--usr-prompt` | **(Required)** Path to text file containing user prompt |
+| `--auto-reply` | **(Required)** Path to text file containing auto-reply prompt |
+
+### Usage Example
+
+```bash
+# Generate scene graphs from video frames
+python star_code/src/generate_graphs.py \
+  --model llama3.2 \
+  --video-dir data/videos \
+  --output-file star_code/notebooks/outputs/out_file.jsonl \
+  --usr-prompt data/prompts/graph_gen/user_prompt.txt \
+  --auto-reply data/prompts/graph_gen/auto_reply.txt \
+  --max-samples 15
+```
+
+## Graph Understanding Module
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `--task` | Task type: `graph-understanding` (default) |
+| `--prompt-type` | **(Required)** Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
+| `--model` | Ollama model to use |
+| `--input-file` | Dataset file containing questions (defaults based on prompt type) |
+| `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset |
+| `--output-file` | File path to save model responses |
+| `--ids-file` | Path to file with question IDs to process (one ID per line) |
+| `--responses-file` | File with responses for evaluation by the judge (used with `judge` prompt type) |
+| `--mode` | Run mode: `generate` (one-shot responses) or `chat` (conversation with reply) |
+| `--reply-file` | File with text for automatic follow-up in chat mode |
+
+### Prompt Types
+
+- `open_qa`: Open-ended question answering with scene graphs
+- `mcq`: Multiple-choice questions with standard formatting
+- `mcq_html`: Multiple-choice questions using HTML-tag formatting
+- `mcq_zs_cot`: Multiple-choice with zero-shot chain-of-thought reasoning
+- `bias_check`: Questions without scene graphs to check model bias
+- `judge`: LLM-as-judge evaluation of previous responses
+
+### Usage Example
+
+```bash
+# Run open-ended QA with chain-of-thought reasoning in chat mode
+python star_code/src/main.py \
+  --task graph-understanding \
+  --model gemma3:4b \
+  --prompt-type open_qa \
+  --mode chat \
+  --input-file star_code/notebooks/outputs/qa.json \
+  --stsg-file star_code/notebooks/outputs/out_file.jsonl \
+  --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
+  --output-file star_code/test_output_new_version.jsonl
+```
+
+### Additional Examples
+
+```bash
+# Run multiple-choice questions on the validation dataset
+python main.py \
+  --task graph-understanding \
+  --prompt-type mcq \
+  --model gemma3:4b \
+  --output-file results/mcq_responses.json
+
+# Evaluate model responses using LLM-as-judge
+python main.py \
+  --prompt-type judge \
+  --model gemma3:27b \
+  --responses-file results/mcq_responses.json \
+  --output-file results/evaluation.json
+```
+
+## Complete Workflow Example
+
+This example shows how to use both modules together in a complete workflow:
+
+1. First, generate scene graphs from videos:
+```bash
+python star_code/src/generate_graphs.py \
+  --model llama3.2 \
+  --video-dir data/videos \
+  --output-file star_code/notebooks/outputs/out_file.jsonl \
+  --usr-prompt data/prompts/graph_gen/user_prompt.txt \
+  --auto-reply data/prompts/graph_gen/auto_reply.txt
+```
+
+2. Then, use the generated graphs to answer questions:
+```bash
+python star_code/src/main.py \
+  --task graph-understanding \
+  --model gemma3:4b \
+  --prompt-type open_qa \
+  --mode chat \
+  --input-file star_code/notebooks/outputs/qa.json \
+  --stsg-file star_code/notebooks/outputs/out_file.jsonl \
+  --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
+  --output-file star_code/test_output_new_version.jsonl
+```
+
+## Notes
+
+- Both modules use pre-defined prompts stored in the `data/prompts/` directory
+- Default datasets are located in `data/datasets/`
+- Responses are streamed for real-time monitoring
+- A fixed seed (13471225022025) is used for reproducibility
+- The Graph Generation module requires ffmpeg to be installed for video frame extraction
+- The generated scene graphs from the first module can be directly used as input to the second module
+
+## Environment Variables
+
+- `OLLAMA_URL`: URL to Ollama server (default: "http://localhost:11434")
