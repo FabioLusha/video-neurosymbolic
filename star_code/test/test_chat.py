@@ -11,6 +11,7 @@ sys.path.append("../src")
 import batch_processor
 import prompt_formatters as pf  # noqa: E402
 from chat_utils import ChatServer
+
 # noqa: E402 - disables warning for this line
 from ollama_manager import OllamaRequestManager, PromptDataset
 
@@ -82,7 +83,7 @@ class TestChatService(unittest.TestCase):
             for i in range(10)
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w+") as in_f:
             json.dump(test_data, in_f)
             in_f.seek(0)
 

@@ -12,7 +12,6 @@ sys.path.append("../src")
 
 import batch_processor
 import batch_processor as bp
-
 # noqa: E402 - disables the warning for this line
 import ollama_manager as om
 import prompt_formatters as pf
@@ -39,7 +38,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             json.dump(test_data, f)
 
         self.temp_sys_prompt_file = tempfile.NamedTemporaryFile(
-            suffix=".json", delete=False
+            suffix=".txt", delete=False
         )
 
         # Create a simple system prompt
@@ -190,7 +189,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             for i in range(10)
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w+") as in_f:
             json.dump(test_data, in_f)
             in_f.seek(0)
 
@@ -234,7 +233,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             for i in range(10)
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w+") as in_f:
             json.dump(test_data, in_f)
             in_f.seek(0)
 
@@ -242,7 +241,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
             # Initialize the generator
-            dataset = PromptDataset(self.temp_data_file.name, prompt_formatter)
+            dataset = PromptDataset(in_f.name, prompt_formatter)
 
             # Get first 10 prompts
             prompts = []
@@ -281,28 +280,29 @@ class StreamingReceiverTestUnit(unittest.TestCase):
 
             pipe.consume(prompts)
 
-            self.assertTrue(os.path.exists(output_filename))
-            with open(output_filename, "r") as out_f:
-                responses = [json.loads(line) for line in out_f.readlines()]
+            # This test is deprecated, we don't write anymore faulty errors in the output_file
+            # self.assertTrue(os.path.exists(output_filename))
+            # with open(output_filename, "r") as out_f:
+            #     responses = [json.loads(line) for line in out_f.readlines()]
 
-                # if this assertion fails check if the consecutive_errors_threshold, it mus be set >= 10
-                self.assertEqual(
-                    len(responses),
-                    len(prompts),
-                    "The pipeline was broken! The pipeline should have continued to process subsequent requests",
-                )
-                for resp in responses:
-                    content = resp["response"]
-                    expected_response = (
-                        "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\nHi, I"
-                    )
-                    self.assertEqual(content.strip(), expected_response)
+            #     # if this assertion fails check if the consecutive_errors_threshold, it must be set >= 10
+            #     self.assertEqual(
+            #         len(responses),
+            #         len(prompts),
+            #         "The pipeline was broken! The pipeline should have continued to process subsequent requests",
+            #     )
+            #     for resp in responses:
+            #         content = resp["response"]
+            #         expected_response = (
+            #             "CAREFUL! THE FOLLOWING RESPONSE GENERATED AN ERROR.\nHi, I"
+            #         )
+            #         self.assertEqual(content.strip(), expected_response)
 
             self.assertTrue(os.path.exists(error_filename))
             with open(error_filename, "r") as out_f:
                 errors = [json.loads(line) for line in out_f.readlines()]
 
-                # if this assertion fails check if the consecutive_errors_threshold, it mus be set >= 10
+                # if this assertion fails check if the consecutive_errors_threshold, it must be set >= 10
                 self.assertEqual(
                     len(errors),
                     len(prompts),
@@ -332,7 +332,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             for i in range(10)
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w+") as in_f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w+") as in_f:
             json.dump(test_data, in_f)
             in_f.seek(0)
 
