@@ -171,10 +171,13 @@ def get_video_duration(video_path):
     return float(data['format']['duration'])
 
 
-def extract_frames(video_path, num_frames, output_dir):
+def extract_frames(video_path, num_frames, output_dir=None):
     """Extract num_frames uniformly sampled frames from the video."""
     # Create temporary output directory
     temp_dir = tempfile.mkdtemp()
+    if output_dir:
+        temp_dir = output_dir
+    
     
     # Get video duration
     duration = get_video_duration(video_path)
@@ -358,10 +361,10 @@ def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_p
         ),
     )
 
-    generate_frames(video_dir, ids, num_frames=10)
+    
     situations = (
         situation_frames
-        for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=max_samples)
+        for situation_frames in generate_frames(video_dir, ids, num_frames=max_samples)
     )
     graph_gen_pipeline.consume(situations)
     return
