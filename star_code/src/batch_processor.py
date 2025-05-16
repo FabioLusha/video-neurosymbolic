@@ -164,8 +164,8 @@ def stream_save(
                     error_f.write(json.dumps(log_msg) + "\n")
                     error_f.flush()
 
-                    res_f.write(json.dumps(response_file_msg) + "\n")
-                    res_f.flush()
+                    #res_f.write(json.dumps(response_file_msg) + "\n")
+                    #res_f.flush()
 
                     print(
                         f"Error at iteration {i}\n"
@@ -251,8 +251,6 @@ class GenerateResponseFormatter(ResponseFormatter):
 
     def format_error_response(self, response_data):
         error = response_data["error"]
-        print("Errrrrrro incoming")
-        print(error)
         traceback_text = ""
         if hasattr(error, "__traceback__"):
             tb = error.__traceback__
@@ -352,7 +350,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
 
         stsg = response_data["stsg"]
         success_response = {
-            "qid": response_data["id"],
+            "video_id": response_data["id"],
             "chat_history": chat_history,
             "stsg": stsg,
         }
@@ -381,13 +379,12 @@ class GeneratedGraphFormatter(ResponseFormatter):
         )
 
         print(f"Chat history keys: {chat_history[0].keys()}")
-        if "images" in chat_history[0]:
-            print("Error branch: Removing image entry")
+        if "images" in chat_history[0]:    
             del chat_history[0]["images"]
 
         stsg = response_data["stsg"]
         error_log = {
-            "qid": response_data["id"],
+            "video_id": response_data["id"],
             "payload": response_data["payload"],
             "chat_history": chat_history,
             "stsg": stsg,
@@ -395,7 +392,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
             "timestamp": datetime.now().isoformat(),
         }
         error_response_message = {
-            "qid": response_data["id"],
+            "video_id": response_data["id"],
             "chat_history": chat_history,
         }
 

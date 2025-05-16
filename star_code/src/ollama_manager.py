@@ -179,20 +179,28 @@ class PromptDataset(Dataset):
 
         if stsg_file_path and not os.path.exists(stsg_file_path):
             raise OSError(f"No such file or directory: '{stsg_file_path}'")
-
-        self.prompt_formatter = prompt_formatter
         self.stsg_file_path = stsg_file_path
 
+        self.prompt_formatter = prompt_formatter
         self._stsg_index = None
         self._stsg_buffer = OrderedDict()
-        self.stsg_buffer_size = 1000
+        self._stsg_buffer_size = 1000
         self._stsg_file_handle = None
         self.q_id_key = None
 
         # Load qa and build STSG index
         self.qa = []
+        ext = os.path.splitext(self.qa_file_path)[1].lower()
         with open(self.qa_file_path, "r") as f:
-            self.qa = json.load(f)
+            # Check if file has a .json extension
+            if ext == ".json":
+                self.qa = json.load(f)
+            elif (ext == ".jsonl") or (ext == ".ndjson"):
+                self.qa = [json.loads(line) for line in f.readlines()]
+            else:
+                raise IOError(
+                    f"{self.qa_file_path} must be either a JSON or JSONL file."
+                )
 
         if len(self.qa) > 0:
             self.q_id_key = "qid" if "qid" in self.qa[0] else "question_id"
@@ -289,7 +297,7 @@ class PromptDataset(Dataset):
             self._stsg_file_handle = open(self.stsg_file_path, "r")
 
         # Clear buffer if it's too large
-        if len(self._stsg_buffer) > self.stsg_buffer_size * 2:
+        if len(self._stsg_buffer) > self._stsg_buffer_size * 2:
             self._stsg_buffer.clear()
 
         # Find positions we need to load
@@ -319,8 +327,8 @@ class PromptDataset(Dataset):
         # Pre-load a chunk around this question
         if question_id in self._stsg_index:
             idx = list(self._stsg_index.keys()).index(question_id)
-            start = max(0, idx - self.stsg_buffer_size // 2)
-            end = min(len(self._stsg_index), idx + self.stsg_buffer_size // 2)
+            start = max(0, idx - self._stsg_buffer_size // 2)
+            end = min(len(self._stsg_index), idx + self._stsg_buffer_size // 2)
             chunk_ids = list(self._stsg_index.keys())[start:end]
             self._load_stsg_chunk(chunk_ids)
 
