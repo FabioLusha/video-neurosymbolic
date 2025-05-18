@@ -16,12 +16,37 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 - Python 3.6+
 - Ollama running locally or on a server
 - ffmpeg (for video processing in the Graph Generation module)
-- Required Python packages (install via `pip install -r requirements.txt`):
-  - requests
-  - pathlib
-  - argparse
+- Required Python packages (install via `pip install -r requirements.txt`)
 
 ## Graph Generation Module
+
+A Vision-Language Model (VLM) powered pipeline that constructs Spatio-Temporal Scene Graphs (STSG) from video input through frame-by-frame analysis.
+
+### Process Flow
+1. **Frame Sampling**: Systematically extracts `--max-samples` evenly spaced frames from the input video
+2. **Graph Construction**: For each sampled frame:
+   - Analyzes visual elements using the specified VLM
+   - Identifies objects, relationships, and temporal connections
+   - Generates hierarchical scene graph descriptions with explicit frame markers
+3. **Output Generation**: Stores results in JSON Lines format with:
+   - `video_id`: Original video identifier
+   - `chat_history`: Complete prompt chain used for graph generation
+   - `stsg`: Textual representation containing:
+     - Sequential frame entries marked with `Frame <frame_n>` headers
+     - Per-frame object relationships in standardized notation
+
+### STSG Textual Format
+The scene graph representation follows this structure:
+```text
+Frame 1:
+  person → holding → phone
+  phone → on → table
+  ...
+Frame 2:
+person → typing-on → laptop
+laptop → placed-on → table
+...
+```
 
 ### Arguments
 
@@ -30,9 +55,9 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 | `--model` | **(Required)** Ollama model to use for image captioning |
 | `--output-file` | **(Required)** Path to save the generated scene graph descriptions |
 | `--video-dir` | **(Required)** Directory containing the videos to process |
-| `--ids-file` | Path to a file containing video IDs to process (one ID per line) |
-| `--max-samples` | Maximum number of frames to sample per video (default: 10) |
-| `--sys-prompt` | Path to text file containing system prompt |
+| `[--ids-file]` | **(Optional)** Path to a file containing video IDs to process (one ID per line) |
+| `[--max-samples]` | Maximum number of frames to sample per video (default: 10) |
+| `[--sys-prompt]` | **(Optional)** Path to text file containing system prompt |
 | `--usr-prompt` | **(Required)** Path to text file containing user prompt |
 | `--auto-reply` | **(Required)** Path to text file containing auto-reply prompt |
 
@@ -41,12 +66,12 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 ```bash
 # Generate scene graphs from video frames
 python star_code/src/generate_graphs.py \
-  --model llama3.2 \
+  --model gemma3:4b \
   --video-dir data/videos \
-  --output-file star_code/notebooks/outputs/out_file.jsonl \
+  --output-file outputs/out_file.json
   --usr-prompt data/prompts/graph_gen/user_prompt.txt \
   --auto-reply data/prompts/graph_gen/auto_reply.txt \
-  --max-samples 15
+  --max-samples 10
 ```
 
 ## Graph Understanding Module
@@ -58,8 +83,8 @@ python star_code/src/generate_graphs.py \
 | `--task` | Task type: `graph-understanding` (default) |
 | `--prompt-type` | **(Required)** Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
 | `--model` | Ollama model to use |
-| `--input-file` | Dataset file containing questions (defaults based on prompt type) |
-| `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset |
+| `--input-file` | Dataset file containing questions (JSON format) |
+| `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset (JSONL format)|
 | `--output-file` | File path to save model responses |
 | `--ids-file` | Path to file with question IDs to process (one ID per line) |
 | `--responses-file` | File with responses for evaluation by the judge (used with `judge` prompt type) |
@@ -115,7 +140,7 @@ This example shows how to use both modules together in a complete workflow:
 1. First, generate scene graphs from videos:
 ```bash
 python star_code/src/generate_graphs.py \
-  --model llama3.2 \
+  --model gemma3:4b \
   --video-dir data/videos \
   --output-file star_code/notebooks/outputs/out_file.jsonl \
   --usr-prompt data/prompts/graph_gen/user_prompt.txt \
