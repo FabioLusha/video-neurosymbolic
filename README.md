@@ -18,6 +18,24 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 - ffmpeg (for video processing in the Graph Generation module)
 - Required Python packages (install via `pip install -r requirements.txt`)
 
+## Setup
+
+Download the ollama container:
+```bash
+docker pull ollama/ollama:latest
+```
+
+Map the internal model directory to the shared `ollama_models` directory in `multiverse`.
+```bash
+  -v /multiverse/datasets/shared/ollama_models:/root/.ollama/
+```
+
+Use lusha/pydev as the container to run the script;
+Set the `OLLAMA_URL` as the name of the running of the ollama container (specifying also the port:
+```bash
+  -e OLLAMA_URL=http://ollama:11434
+```
+
 ## Graph Generation Module
 
 A Vision-Language Model (VLM) powered pipeline that constructs Spatio-Temporal Scene Graphs (STSG) from video input through frame-by-frame analysis.
