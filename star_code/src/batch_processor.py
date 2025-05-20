@@ -349,8 +349,12 @@ class GeneratedGraphFormatter(ResponseFormatter):
             del chat_history[0]["images"]
 
         stsg = response_data["stsg"]
+        start_time = response_data.get('start', None)
+        end_time = response_data.get('end', None)
         success_response = {
             "video_id": response_data["id"],
+            "start": start_time,
+            "end": end_time,
             "chat_history": chat_history,
             "stsg": stsg,
         }
