@@ -97,14 +97,14 @@ def main():
     # Process IDs if provided
     video_info = None
     if args.videos_metadata:
-        videos_metadata_path = Path(args.videos_metadat)
+        videos_metadata_path = Path(args.videos_metadata)
 
         if not videos_metadata_path.exists():
             raise FileNotFoundError(f"File not found: {videos_metadata_path}")
 
         ext = videos_metadata_path.suffix.lower()
 
-        print(f"=== Loading file with videos metadata: {args.ids_file}")
+        print(f"=== Loading file with videos metadata: {args.videos_metadata}")
         with open(videos_metadata_path, "r", encoding="utf-8") as f:
             if ext == '.json':
                 data = json.load(f)
@@ -124,7 +124,7 @@ def main():
     else:
         print("=== No video metadata file chosen")
     
-    url = args.ollama_url or os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
     
     # Load system prompt
     sys_prompt = None
@@ -137,9 +137,9 @@ def main():
         "system": sys_prompt,
         "stream": True,
         "options": {
-            "num_ctx": args.context_length,
-            "temperature": args.temperature,
-            "num_predict": args.max_tokens,
+            "num_ctx": 10240,
+            "temperature": 0.1,
+            "num_predict": 2048,
             "seed": SEED,
         },
     }
@@ -156,8 +156,7 @@ def main():
         args.output_file, 
         video_info=video_info,
         usr_prompt=usr_prompt,
-        reply=reply, 
-        iters=args.iterations,
+        reply=reply,
         max_samples=args.max_samples,
     )
 
@@ -231,13 +230,13 @@ def extract_frames(video_path, num_frames, max_fps=1, output_dir=None, start_tim
     # Ensure start_time is within valid range
     start_time = max(0, min(start_time, end_time - 0.1))
     
+    # Limit the FPS sampling
+    if num_frames / (end_time - start_time) > max_fps:
+        num_frames = int((end_time - start_time) / max_fps)
     # Calculate time intervals within the specified range
     if num_frames <= 1:
         intervals = [(start_time + end_time) / 2]  # Just the middle of the range
     else:
-        # Limit the FPS sampling
-        if num_frames / (end_time - start_time) > max_fps:
-            num_frames = max_fps
         # Calculate time points within the specified range
         intervals = [start_time + i * (end_time - start_time) / (num_frames - 1) 
                     for i in range(num_frames)]
@@ -271,7 +270,7 @@ def extract_frames(video_path, num_frames, max_fps=1, output_dir=None, start_tim
     
     return temp_dir, frame_paths
 
-def generate_frames(video_dir, video_info, num_frames=10):
+def generate_frames(video_dir, video_info=None, num_frames=10):
     """
     Generate frames from specific videos in a directory with custom time ranges.
     
@@ -285,9 +284,13 @@ def generate_frames(video_dir, video_info, num_frames=10):
     """
     video_dir = Path(video_dir)
     
+    if video_info is None:
+        video_files = list(video_dir.glob("*.mp4"))
+        video_info = [{'video_id': v.stem} for v in video_files]
+        
     for video_metadata in video_info:
         video_id = video_metadata['video_id']
-        start_time = video_metadata.get('start', None),
+        start_time = video_metadata.get('start', None)
         end_time = video_metadata.get('end', None)
 
         video_path = video_dir / f"{video_id}.mp4"
@@ -381,9 +384,13 @@ def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_p
     def payload_gen(situations):
         for video in situations:
             video_id = video['video_id']
-            start = video['start']
-            end = video['end']
+            start = video.get('start', None)
+            end = video.get('end', None)
 
+            print(f"\nVideo: {video_id}")
+            print(f" - interval: {start}-{end}")
+            print(f" - {len(video['frames'])} frames.")
+            
             for frame in video['frames']:
                 req_obj = {
                     # qid for backward compatibility
