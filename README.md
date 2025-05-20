@@ -35,6 +35,13 @@ Set the `OLLAMA_URL` as the name of the running of the ollama container (specify
 ```bash
   -e OLLAMA_URL=http://ollama:11434
 ```
+### Run Ollama
+
+Example:
+
+```bash
+docker compose -f new-compose.yaml run --service-ports --rm --name ollama_instance ollama-1
+```
 
 ## Graph Generation Module
 
