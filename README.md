@@ -2,6 +2,8 @@
 
 A comprehensive toolkit for generating and understanding spatio-temporal scene graphs (STSG) using Ollama-powered language models.
 
+## TODO
+[ ] Add ollama options config file to be passed as argument
 ## Overview
 
 This toolkit consists of two complementary modules:
@@ -20,28 +22,61 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 
 ## Setup
 
+### Ollama
 Download the ollama container:
 ```bash
 docker pull ollama/ollama:latest
 ```
-
-Map the internal model directory to the shared `ollama_models` directory in `multiverse`.
-```bash
-  -v /multiverse/datasets/shared/ollama_models:/root/.ollama/
+Run the ollama container:
+```
+docker compose -f ollama/ollama-compose.yaml up
 ```
 
-Use lusha/pydev as the container to run the script;
-Set the `OLLAMA_URL` as the name of the running of the ollama container (specifying also the port:
+### Dev env
+Build the python devel contain in the dev_container directory (may require several minutes):
 ```bash
-  -e OLLAMA_URL=http://ollama:11434
+cd dev_container
+docker build -t lusha/pydev
 ```
-### Run Ollama
 
-Example:
-
+Run the container:
 ```bash
-docker compose -f new-compose.yaml run --service-ports --rm --name ollama_instance ollama-1
+docker compose -f dev_container/compose.yaml up
 ```
+Attach to the container:
+```bash
+docker exec -it <username>_pydev_env bash
+```
+
+Run the script (here the graph generation pipeline):
+```bash
+python star_code/src/graph_gen.py \
+      --model gemma3:4b \
+      --video-dir /multiverse/datasets/shared/action-genome/Charades_v1_480 \
+      --videos-metadata /multiverse/datasets/shared/STAR/STAR_annotations/STAR_val.json \
+      --output-file outputs/generated_stsg.jsonl \
+      --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
+      --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
+      --max-samples 5
+```
+
+### Set-up details
+Info about the compose files:  
+
+1. Attach the `ollama_models` directory in `multiverse` to the `/.ollama`. The shared directory contain
+the weights of a bunch of models used in the previous experiments. In this manner you don't need to 
+download again the model
+```bash
+  -v /multiverse/datasets/shared/ollama_models:/.ollama
+```
+
+2.Use lusha/pydev as the container to run the script;
+Set the `OLLAMA_URL` as the name of the running of the ollama container (specifying also the port):
+```bash
+  -e OLLAMA_URL=http://lusha_ollama:11435
+```
+
+
 
 ## Graph Generation Module
 
