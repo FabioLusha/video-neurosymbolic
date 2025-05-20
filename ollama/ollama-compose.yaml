@@ -1,0 +1,30 @@
+networks:
+  default:
+    name: ${USER}_ollama_net
+
+services:
+  ollama_service:
+    image: ollama/ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11435
+      - OLLAMA_LOG=debug
+      - OLLAMA_DEBUG=1
+      - OLLAMA_NUM_PARALLEL=2
+    user: "${UID-1142}:${GID-1142}"
+    ports:  
+      - "11435:11435"
+    volumes:
+      - /multiverse/datasets/shared/ollama_models:/.ollama
+    container_name: ${USER}_ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["3"]
+              capabilities: [gpu]
+    cpuset: "0-7"
+    restart: "no"
+    runtime: "nvidia"
+    networks:
+      - default

@@ -5,7 +5,7 @@ networks:
 
 # yaml anchor
 x-ollama: &ollama
-  image: lusha/ollama
+  image: ollama/ollama
   environment: &env
     OLLAMA_HOST: "0.0.0.0:11435"
     OLLAMA_DEBUG: 1
@@ -15,7 +15,7 @@ x-ollama: &ollama
   ports:  
     - "11435:11435"
   volumes:
-    - /home/lusha/storage/ollama/ollama_models:/.ollama 
+    - /multiverse/datasets/shared/ollama_models:/.ollama 
   cpuset: "0-7"
   restart: "no"
   networks:
@@ -36,7 +36,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["4"]
+              device_ids: ["3"]
               capabilities: [gpu]
 
   ollama-2:
@@ -52,5 +52,5 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              device_ids: ["3"]
               capabilities: [gpu]

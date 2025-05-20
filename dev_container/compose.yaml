@@ -1,11 +1,11 @@
 networks:
   default:
-    name: lusha_net
+    name: ${USER}_ollama_net
 
 services:
   env_container:
     image: lusha/pydev
-    container_name: lusha_pydev_env
+    container_name: ${USER}_pydev_env
     env_file:
       - .env
     user: "1142:1142"
@@ -26,6 +26,4 @@ services:
           devices:
             - capabilities: [gpu]
               device_ids: ["3"]
-    cpuset: "20-23"
-    networks:
-      - default
+    cpuset: "0-7"
