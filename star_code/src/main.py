@@ -8,7 +8,7 @@ from pathlib import Path
 
 import batch_processor
 import prompt_formatters as pf
-from ollama_manager import OllamaRequestManager, PromptDataset
+from ollama_manager import OllamaRequestManager, STARDataset
 from STAR_utils.visualization_tools import vis_utils
 
 SEED = 13471225022025
@@ -61,10 +61,10 @@ def load_mcq_prompts():
 def load_mcq_html_prompts():
     # PROMPT FOR MULTI-CHOICE QA WITH HTML TAGS
     mcq_system_prompt = _load_prompt_fromfile(
-        BASE_DIR / "data/promtps/MCQ_system_prompt_v3.txt"
+        BASE_DIR / "data/prompts/MCQ_system_prompt_v3.txt"
     )
     mcq_pformat = """\
-        <STSG>\n{stsg}\n<\STSG>
+        <STSG>\n{stsg}\n</STSG>
         <Question>
         {question}
         Alternatives:
@@ -72,7 +72,7 @@ def load_mcq_html_prompts():
         B. {c2}
         C. {c3}
         D. {c4}
-        <\Question>
+        </Question>
         """
 
     mcq_pformatter = pf.MCQPrompt(mcq_pformat)
@@ -101,9 +101,9 @@ def load_bias_check_prompts():
         BASE_DIR / "data/prompts/system_prompt_bias_check.txt"
     )
     mcq_bias_pformat = "Q: {question}\n" "{c1}\n{c2}\n{c3}\n{c4}\n" "A:"
-    mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
+    mcq_bias_pformatter = pf.MCQPromptWoutSTSG(mcq_bias_pformat)
 
-    return mcq_system_prompt_bias, mcq_bias_pfromatter
+    return mcq_system_prompt_bias, mcq_bias_pformatter
 
 
 def load_llm_as_judge_prompts(responses_filepath):
@@ -122,9 +122,9 @@ def load_vqa_prompts():
     user_prompt = _load_prompt_fromfile(
         BASE_DIR / "data/prompts/img_answer/user_prompt.txt"
     )
-    mcq_bias_pfromatter = pf.MCQPromptWoutSTSG(user_prompt)
+    mcq_bias_pformatter = pf.MCQPromptWoutSTSG(user_prompt)
 
-    return None, mcq_bias_pfromatter
+    return None, mcq_bias_pformatter
 
 
 def _load_prompt_fromfile(filename):
@@ -187,7 +187,7 @@ def run_with_prompts(
         print("=== No ids file chosen")
 
     print(f"=== Generating prompts from: {input_filepath}")
-    dataset = PromptDataset(input_filepath, prompt_formatter, stsg_file_path=args.stsg_file, ids=ids)
+    dataset = STARDataset(input_filepath, prompt_formatter, stsg_file_path=args.stsg_file, ids=ids)
     prompts = [dataset[i] for i in range(len(dataset))]
 
     # Generate responses
@@ -245,9 +245,10 @@ def main():
         choices=MODELS,
         help="Which model to use",
     )
+
     parser.add_argument(
         "--input-file",
-        help="Input dataset file path (defaults based on prompt type)"
+        help="Input dataset file path (STAR dataset specification)"
     )
     parser.add_argument(
         "--stsg-file",
@@ -255,7 +256,7 @@ def main():
     )
     parser.add_argument(
         "--output-file",
-        help="file path where to save the response)"
+        help="file path where to save the response"
     )
     parser.add_argument(
         '--ids-file',
@@ -277,13 +278,14 @@ def main():
 
     args = parser.parse_args()
 
+
+    
     # Set default input file based on prompt type
     input_file = args.input_file
     if not input_file:
-        if args.prompt_type in ["open_qa"]:
-            input_file = BASE_DIR / "data/datasets/STAR_question_and_stsg.json"
-        else:
-            input_file = BASE_DIR / "data/datasets/STAR_QA_and_stsg_val.json"
+        input_file = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
+        print(f"Using default: {input_file}")
+        
 
     # Special handling for judge prompt type
     responses_file = None
@@ -297,33 +299,7 @@ def main():
     if ids_file_path:
         with open(ids_file_path, "r") as f:
             ids = [line.strip() for line in f.readlines()]
-
-    if args.task == "graph-gen":
-
-        # TODO: remove default URL value and throw excpetion when OLLAMA_URL
-        # is not set
-        url = os.environ.get("OLLAMA_URL", "http://lusha_ollama:11434")
-
-        sys_file_path = BASE_DIR / "data/prompts/graph_gen/system_prompt.txt"
-
-        sys_prompt = _load_prompt_fromfile(sys_file_path)
-        # model_options = _load_model_options()
-        ollama_params = {
-            "model": args.model,
-            "system": sys_prompt,
-            "stream": True,
-            "options": {
-                "num_ctx": 10240,
-                "temperature": 0.1,
-                "num_predict": 1024,
-                "seed": SEED,
-            },
-        }
-
-        client = OllamaRequestManager(url, ollama_params)
-        streaming_frame_generation(client, args.output_file, ids=ids, iters=-1)
-        return
-
+            
     # Load the selected prompts
     load_func = prompt_types[args.prompt_type]
     system_prompt, prompt_formatter = load_func()
@@ -339,164 +315,6 @@ def main():
         output_filepath=args.output_file,
         ids_filepath=ids_file_path,
     )
-
-
-def generate_frames(iters=-1, max_sample=10, ids=None):
-
-    star_data = []
-    val_path = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
-    with open(val_path) as in_file:
-        star_data = json.load(in_file)
-
-    raw_frame_dir = BASE_DIR / "data/datasets/action-genome/frames"
-
-    if ids:
-        id_to_dict = {d["question_id"]: d for d in star_data}
-        star_data = [id_to_dict[id] for id in ids]
-
-    for sample in star_data:
-        frame_ids = sorted(list(sample["situations"].keys()))
-        frame_ids = vis_utils.sample_frames(frame_ids, max_sample)
-
-        frame_dir = raw_frame_dir / f"{sample['video_id']}.mp4"
-        b64_encodings = []
-        for f_id in frame_ids:
-            img_path = frame_dir / f"{f_id}.png"
-            if not img_path.exists():
-                continue
-            with open(img_path, "rb") as f:
-                img_bytes = f.read()
-                b64_encodings.append(
-                    {
-                        "frame_id": f_id,
-                        "encoding": base64.b64encode(img_bytes).decode("utf-8"),
-                    }
-                )
-
-        frames = []
-        for encoding in b64_encodings:
-            frames.append({"question_id": sample["question_id"], **encoding})
-
-        yield frames
-
-        iters -= 1
-        if iters == 0:
-            return  # stop generation
-
-
-def extract_frame_description(text):
-    # the ?s: in the middle capturing group sets the flag re.DOTALL
-    pattern = "(?<=<scene_graph>)(?s:.+)(?=</scene_graph)"
-    match = re.search(pattern, text)
-
-    return match.group(0) if match else ""
-
-
-def frame_aggregator(stream):
-
-    o1 = next(stream)
-    agg = []
-    while o1 is not None:
-        frame_id = o1.pop("frame_id")
-        sg = o1.pop("sg")
-        agg.append(f"\nFrame {frame_id}:\n{sg}")
-        try:
-            o2 = next(stream)
-            if o2["qid"] != o1["qid"]:
-                yield {**o1, "stsg": "".join(agg)}
-                agg = []
-
-            o1 = o2
-        except StopIteration | TypeError:
-            yield {**o1, "stsg": "".join(agg)}
-            return  # Generator stops here
-
-
-def streaming_frame_generation(ollama_client, output_file_path, ids=None, iters=-1):
-
-    prompt1 = """\
-    Look carefully at this image and identify all objects and relationships present.
-
-    First, list all distinct objects you can detect in the image. Be thorough and specific with your object labels (e.g., "young woman" rather than just "person", "wooden chair" rather than just "chair").
-
-    Then, describe the key relationships between these objects in free-form text. Consider:
-    - Spatial relationships (above, below, behind, inside, etc.)
-    - Action-based relationships (holding, looking at, sitting on, etc.)
-    - Physical connections (attached to, part of, touching, etc.)
-    - Relative positions (next to, between, surrounding, etc.)
-
-    Think step by step.\
-    """
-
-    prompt2 = """\
-    Now organize the objects and relationships you identified into a formal scene graph using this format:
-    object1 ---- relationship ---- object2
-
-    The list of relationship predicates should be introduced by the tag <scene_graph> and terminated by the tag </scene_graph>
-    For example:
-    woman ---- sitting_on ---- chair
-    dog ---- lying_under ---- table
-    book ---- on_top_of ---- shelf
-
-    Please follow these guidelines:
-    1. Create at least 10 relationship triplets (more if the image is complex)
-    2. Use specific and consistent object labels
-    3. Use concise but descriptive relationship terms (connect words with underscores)
-    4. Include all meaningful relationships between objects
-    5. Verify that all objects you identified in step 1 appear in at least one relationship
-
-    Your scene graph:\
-    """
-
-    def payload_gen(situations):
-        for frames in situations:
-            for frame in frames:
-                req_obj = {
-                    "qid": frame["question_id"],
-                    "frame_id": frame["frame_id"],
-                    "payload": {
-                        **ollama_client.ollama_params,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": prompt1,
-                                "images": [frame["encoding"]],
-                            }
-                        ],
-                    },
-                }
-
-                yield req_obj
-
-    bp = batch_processor
-    graph_gen_pipeline = bp.Pipeline(
-        payload_gen,
-        lambda payload_gen: bp.stream_request(
-            payload_gen, ollama_client, endpoint="chat"
-        ),
-        lambda stream: bp.auto_reply_gen(stream, prompt2),
-        # check the response is ok before passing to frame_extraction,
-        lambda stream: (o for o in stream if o["status"] == "ok"),
-        lambda stream: (
-            {
-                **stream_obj,
-                "sg": extract_frame_description(stream_obj["response"]["content"]),
-            }
-            for stream_obj in stream
-        ),
-        lambda stream: frame_aggregator(stream),
-        lambda stream: bp.stream_save(
-            stream, bp.GeneratedGraphFormatter(), output_file_path
-        ),
-    )
-
-    situations = (
-        situation_frames
-        for situation_frames in generate_frames(ids=ids, iters=iters, max_sample=10)
-    )
-    graph_gen_pipeline.consume(situations)
-    return
-
 
 def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
 
