@@ -17,7 +17,7 @@ x-req_manager: &req_manager
   environment: &env
     OLLAMA_URL: http://lusha_ollama:11435
     PYTHONUNBUFFERED: 1
-    CUDA_VISIBLE_DEVICES: "" 
+    CUDA_VISIBLE_DEVICES: ""
   entrypoint: ['python']
   cpuset: "0-7"
   networks:
@@ -30,11 +30,11 @@ services:
       << : [*env]
       OLLAMA_URL: http://lusha_ollama_vqa1:11435
     command: [
-      '-u', 
-      'star_code/src/main.py', 
+      '-u',
+      'star_code/src/main.py',
       '--task', 'vqa',
-      '--model', 'llama3.1:8b', 
-      '--prompt-type', 'vqa', 
+      '--model', 'llama3.1:8b',
+      '--prompt-type', 'vqa',
       '--mode', 'chat',
       '--ids-file', 'star_code/src/rem_val1_ids.txt',
       '--output-file', 'star_code/outputs/responses_llama3.1:8b_VQA_val1_20250503_10:05:99.jsonl']
@@ -44,29 +44,61 @@ services:
       << : [*env]
       OLLAMA_URL: http://lusha_ollama_vqa:11435
     command: [
-      '-u', 
-      'star_code/src/main.py', 
+      '-u',
+      'star_code/src/main.py',
       '--task', 'vqa',
-      '--model', 'llama3.1:8b', 
-      '--prompt-type', 'vqa', 
+      '--model', 'llama3.1:8b',
+      '--prompt-type', 'vqa',
       '--mode', 'chat',
       '--ids-file', 'star_code/src/rem_val2_ids.txt',
       '--output-file', 'star_code/outputs/responses_llama3:8b_VQA_val2_20250502_23:17:99.jsonl']
-  
+
   graph_understanding:
     << : *req_manager
     environment:
       << : [*env]
       OLLAMA_URL: http://lusha_ollama:11435
     command: [
-      '-u', 
-      'star_code/src/main.py', 
+      '-u',
+      'star_code/src/main.py',
       '--task', 'graph-understanding',
-      '--model', 'gemma3:4b-it-qat', 
-      '--prompt-type', 'mcq_zs_cot', 
+      '--model', 'gemma3:4b',
+      '--prompt-type', 'open_qa',
       '--mode', 'chat',
-      '--input-file', 'star_code/data/datasets/STAR_QA_and_stsg_val.json',
-      '--output-file', 'star_code/outputs/responses_to_genframes_gemma3:4b-it-qat_20250512_16:55:99.jsonl']
+      '--input-file', 'star_code/notebooks/outputs/qa.json',
+      '--stsg-file', 'star_code/notebooks/outputs/out_file.jsonl',
+      '--reply-file', 'star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt',
+      '--output-file', 'star_code/test_output_new_version.jsonl']
+
+  graph_understanding2:
+    << : *req_manager
+    environment:
+      << : [*env]
+      OLLAMA_URL: http://lusha_ollama2:11432
+    command: [
+      '-u',
+      'star_code/src/main.py',
+      '--task', 'graph-understanding',
+      '--model', 'llama3.1:8b',
+      '--prompt-type', 'mcq_zs_cot',
+      '--mode', 'chat',
+      '--input-file', 'star_code/data/datasets/STAR_QA_and_gen_stsg_p1.json',
+      '--output-file', 'star_code/outputs/responses_to_genframes_llama3.1:8b_20250513_09:02:99.jsonl']
+
+  graph_understanding3:
+    << : *req_manager
+    environment:
+      << : [*env]
+      OLLAMA_URL: http://lusha_ollama2:11432
+    command: [
+      '-u',
+      'star_code/src/main.py',
+      '--task', 'graph-understanding',
+      '--model', 'llama3.1:8b',
+      '--prompt-type', 'mcq_zs_cot',
+      '--mode', 'chat',
+      '--input-file', 'star_code/data/datasets/STAR_QA_and_gen_stsg_p2.json',
+      '--output-file', 'star_code/outputs/responses_to_genframes_p2_llama3.1:8b_20250513_09:02:99.jsonl']
 
   graph_generation:
     environment:
@@ -77,11 +109,11 @@ services:
     image: lusha/pydev
     entrypoint: ['python']
     command: [
-      '-u', 
-      'star_code/src/main.py', 
+      '-u',
+      'star_code/src/main.py',
       '--task', 'graph-gen',
       '--model', 'gemma3:4b',
-      '--prompt-type', 'mcq_zs_cot', 
+      '--prompt-type', 'mcq_zs_cot',
       '--mode', 'chat',
       '--ids-file', 'star_code/src/rem_val1_ids.txt',
       '--output-file', 'star_code/outputs/genframes_rem_val1_gemma3:4b_20250501_10:16:99.jsonl']
@@ -112,11 +144,11 @@ services:
     image: lusha/pydev
     entrypoint: ['python']
     command: [
-      '-u', 
-      'star_code/src/main.py', 
+      '-u',
+      'star_code/src/main.py',
       '--task', 'graph-gen',
       '--model', 'gemma3:4b',
-      '--prompt-type', 'mcq_zs_cot', 
+      '--prompt-type', 'mcq_zs_cot',
       '--mode', 'chat',
       '--ids-file', 'star_code/src/rem_val2_ids.txt',
       '--output-file', 'star_code/outputs/genframes_rem_val2_gemma3:4b_20250501_10:16:99.jsonl']

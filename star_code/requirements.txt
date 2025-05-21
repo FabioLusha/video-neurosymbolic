@@ -1,8 +1,6 @@
 requests>=2.31.0
-opencv-pyton>=4.11
-pickle
+opencv-python>=4.11
 IPython
 numpy
 matplotlib
-json
 ipyplot
