@@ -2,8 +2,19 @@
 
 A comprehensive toolkit for generating and understanding spatio-temporal scene graphs (STSG) using Ollama-powered language models.
 
+## Features
+
+- Generate spatio-temporal scene graphs from video content
+- Process existing scene graphs for question answering and reasoning
+- Compatible with various LLMs through Ollama
+- Configurable prompting strategies for different tasks
+
 ## TODO
-[ ] Add ollama options config file to be passed as argument
+
+- [ ] Add Ollama options config file to be passed as argument
+- [ ] Add functionality to pass system/user/reply prompts from arguments
+- [ ] Support for batch processing of multiple videos
+
 ## Overview
 
 This toolkit consists of two complementary modules:
@@ -18,65 +29,116 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 - Python 3.6+
 - Ollama running locally or on a server
 - ffmpeg (for video processing in the Graph Generation module)
+- Docker and Docker Compose (for containerized setup)
 - Required Python packages (install via `pip install -r requirements.txt`)
 
 ## Setup
 
-### Ollama
-Download the ollama container:
-```bash
-docker pull ollama/ollama:latest
-```
-Run the ollama container:
-```
-docker compose -f ollama/ollama-compose.yaml up
+### Ollama Setup
+
+1. Download the Ollama container:
+   ```bash
+   docker pull ollama/ollama:latest
+   ```
+
+2. Run the Ollama container:
+   ```bash
+   docker compose -f ollama/ollama-compose.yaml up
+   ```
+
+### Development Environment
+
+1. Build the Python development container (contains all dependencies):
+   ```bash
+   cd dev_container
+   docker build -t lusha/pydev .
+   ```
+
+2. Run the container:
+   ```bash
+   docker compose -f dev_container/compose.yaml up -d
+   ```
+
+3. Attach to the container:
+   ```bash
+   docker exec -it <username>_pydev_env bash
+   ```
+
+### Configuration Details
+
+#### Critical Container Configuration
+
+When running Ollama in a container, you **must** set the `OLLAMA_URL` environment variable to point to the container name where Ollama is running:
+
+```yaml
+environment:
+  - OLLAMA_URL=http://lusha_ollama:11435
 ```
 
-### Dev env
-Build the python devel contain in the dev_container directory (may require several minutes):
-```bash
-cd dev_container
-docker build -t lusha/pydev
-```
+> **Important**: Replace `lusha_ollama` with the actual name of your running Ollama container. The toolkit will fail to connect to Ollama if this configuration is incorrect.
 
-Run the container:
-```bash
-docker compose -f dev_container/compose.yaml up
-```
-Attach to the container:
-```bash
-docker exec -it <username>_pydev_env bash
-```
+#### Additional Docker Compose Settings
 
-Run the script (here the graph generation pipeline):
+The Docker Compose setup also includes:
+
+1. Pre-loaded models directory to avoid re-downloading models:
+   ```yaml
+   volumes:
+     - /multiverse/datasets/shared/ollama_models:/.ollama
+   ```
+
+This volume mapping allows you to reuse existing model files across container restarts.
+
+## Usage
+
+### Graph Generation
+
+Run the graph generation pipeline:
+
 ```bash
 python star_code/src/graph_gen.py \
-      --model gemma3:4b \
-      --video-dir /multiverse/datasets/shared/action-genome/Charades_v1_480 \
-      --videos-metadata /multiverse/datasets/shared/STAR/STAR_annotations/STAR_val.json \
-      --output-file outputs/generated_stsg.jsonl \
-      --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
-      --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
-      --max-samples 5
+  --model gemma3:4b \
+  --video-dir /multiverse/datasets/shared/action-genome/Charades_v1_480 \
+  --videos-metadata /multiverse/datasets/shared/STAR/STAR_annotations/STAR_val.json \
+  --output-file outputs/generated_stsg.jsonl \
+  --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
+  --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
+  --max-samples 5
 ```
 
-### Set-up details
-Info about the compose files:  
+### Graph Understanding
 
-1. Attach the `ollama_models` directory in `multiverse` to the `/.ollama`. The shared directory contain
-the weights of a bunch of models used in the previous experiments. In this manner you don't need to 
-download again the model
+Process generated STSGs for question answering:
+
 ```bash
-  -v /multiverse/datasets/shared/ollama_models:/.ollama
+python star_code/src/main.py \
+  --task graph-understanding \
+  --model gemma3:4b \
+  --prompt-type mcq_zs_cot \
+  --mode chat \
+  --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
+  --stsg-file star_code/data/datasets/STAR_QA_and_stsg_val.json \
+  --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
+  --output-file gemma3_4b_qa.jsonl
 ```
 
-2.Use lusha/pydev as the container to run the script;
-Set the `OLLAMA_URL` as the name of the running of the ollama container (specifying also the port):
-```bash
-  -e OLLAMA_URL=http://lusha_ollama:11435
+## Project Structure
+
 ```
-
-
+├── star_code/
+│   ├── src/
+│   │   ├── graph_gen.py        # Graph generation module
+│   │   ├── main.py             # Main entry point
+│   │   └── ...
+│   ├── data/
+│       ├── prompts/            # Prompt templates
+│       │   ├── graph_gen/
+│       │   └── zero-shot-cot/
+│       └── datasets/           # Sample datasets
+├── ollama/                     # Ollama configuration
+├── dev_container/              # Development environment
+└── requirements.txt           # Python dependencies
+```
 
 ## Graph Generation Module
 
@@ -167,12 +229,12 @@ python star_code/src/generate_graphs.py \
 python star_code/src/main.py \
   --task graph-understanding \
   --model gemma3:4b \
-  --prompt-type open_qa \
+  --prompt-type mcq_zs_cot \
   --mode chat \
-  --input-file star_code/notebooks/outputs/qa.json \
-  --stsg-file star_code/notebooks/outputs/out_file.jsonl \
+  --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
+  --stsg-file star_code/data/datasets/STAR_QA_and_stsg_val.json \
   --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
-  --output-file star_code/test_output_new_version.jsonl
+  --output-file gemma3_4b_qa.jsonl
 ```
 
 ### Additional Examples
