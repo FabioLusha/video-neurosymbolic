@@ -106,8 +106,8 @@ def stream_save(
 
         # Create directory if it doesn't exists
         dir = os.path.dirname(output_file_path)
-        output_dir = dir if dir != "" else "outputs"
-        os.makedirs(dir, exist_ok=True)
+        output_dir = dir if dir != "" or dir == None else "outputs"
+        os.makedirs(output_dir, exist_ok=True)
 
     else:
         # Create logs directory if it doesn't exist
