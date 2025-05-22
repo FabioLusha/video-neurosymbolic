@@ -28,7 +28,6 @@ MODELS = [
 
 BASE_DIR = Path(__file__).parent.parent
 
-
 def _load_prompt_fromfile(filename):
     try:
         with open(filename) as in_file:
@@ -36,14 +35,12 @@ def _load_prompt_fromfile(filename):
     except IOError as e:
         raise IOError(f"Error reading prompt file: {e}")
 
-
 def _load_model_options():
     try:
         with open(BASE_DIR / "src/ollama_model_options.json") as in_file:
             return json.load(in_file)
     except IOError as e:
         raise IOError(f"Error reading the model's options file: {e}") from e
-
 
 def run_with_prompts(
     args,
@@ -88,9 +85,7 @@ def run_with_prompts(
         print("=== No ids file chosen")
 
     print(f"=== Generating prompts from: {input_filepath}")
-    dataset = STARDataset(
-        input_filepath, prompt_formatter, stsg_file_path=args.stsg_file, ids=ids
-    )
+    dataset = STARDataset(input_filepath, prompt_formatter, stsg_file_path=args.stsg_file, ids=ids)
     prompts = [dataset[i] for i in range(len(dataset))]
 
     # Generate responses
@@ -108,8 +103,7 @@ def run_with_prompts(
         else:
             raise ValueError(
                 "You have chosen chat mode prompting but haven't provided any reply"
-                "prompt. Pass the reply prompt thorugh the parameter --reply-file"
-            )
+                "prompt. Pass the reply prompt thorugh the parameter --reply-file")
         if args.task == "vqa":
             # TODO: Implement the feature and remove the print
             print("This feature is not implemented yet!!!")
@@ -122,37 +116,36 @@ def run_with_prompts(
                 ollama_client, prompts, reply, output_file_path=output_filepath
             )
 
-
 def main():
     # Define available prompt types and their corresponding formatter classes
     default_prompts = {
         "open_qa": (
             BASE_DIR / "data/prompts/system_prompt.txt",
-            BASE_DIR / "data/prompts/OPEN_QA_stsg_usr_prompt.txt",
+            BASE_DIR / "data/prompts/OPEN_QA_stsg_usr_prompt.txt"
         ),
         "mcq": (
             BASE_DIR / "data/prompts/mcq/MCQ_system_prompt_v2_oneshot.txt",
-            BASE_DIR / "data/prompts/mcq/MCQ_usr_prompt.txt",
+            BASE_DIR / "data/prompts/mcq/MCQ_usr_prompt.txt"
         ),
         "mcq_html": (
             BASE_DIR / "data/prompts/mcq/MCQ_system_prompt_v3.txt",
-            BASE_DIR / "data/prompts/mcq/MCQ_usr_prompt_html_tags.txt",
+            BASE_DIR / "data/prompts/mcq/MCQ_usr_prompt_html_tags.txt"
         ),
         "mcq_zs_cot": (
             BASE_DIR / "data/prompts/zero-shot-cot/MCQ_system_prompt_ZS_CoT.txt",
-            BASE_DIR / "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt",
+            BASE_DIR / "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt"
         ),
         "bias_check": (
             BASE_DIR / "data/prompts/system_prompt_bias_check.txt",
-            BASE_DIR / "data/prompts/MCQ_user_prompt_bias_check.txt",
+            BASE_DIR / "data/prompts/MCQ_user_prompt_bias_check.txt"
         ),
         "judge": (
             BASE_DIR / "data/prompts/LLM_judge_system_v2.txt",
-            BASE_DIR / "data/prompts/LLM_judge_user_v2.txt",
+            BASE_DIR / "data/prompts/LLM_judge_user_v2.txt"
         ),
         "vqa": (
             BASE_DIR / "data/prompts/img_answer/system_prompt.txt",
-            BASE_DIR / "data/prompts/img_answer/user_prompt.txt",
+            BASE_DIR / "data/prompts/img_answer/user_prompt.txt"
         ),
     }
 
@@ -184,10 +177,10 @@ def main():
     )
     parser.add_argument(
         "--system-prompt",
-        help="Optional system prompt (overrides default). Use empty string for no system prompt.",
-    )
+        help="Optional system prompt (overrides default). Use empty string for no system prompt.")
     parser.add_argument(
-        "--user-prompt", help="Optional user prompt (overrides default)"
+        "--user-prompt",
+        help="Optional user prompt (overrides default)"
     )
     parser.add_argument(
         "--model",
@@ -195,19 +188,24 @@ def main():
         help="Which model to use",
     )
     parser.add_argument(
-        "--input-file", help="Input dataset file path (STAR dataset specification)"
+        "--input-file",
+        help="Input dataset file path (STAR dataset specification)"
     )
     parser.add_argument(
         "--stsg-file",
-        help="File with the spatio-temporal scene graphs if these are not included in the main dataset",
-    )
-    parser.add_argument("--output-file", help="file path where to save the response")
-    parser.add_argument(
-        "--ids-file",
-        help="Path to a file containing question IDs to process (one ID per line)",
+        help="File with the spatio-temporal scene graphs if these are not included in the main dataset"
     )
     parser.add_argument(
-        "--responses-file", help="File with the responses to be evaluated by the judge"
+        "--output-file",
+        help="file path where to save the response"
+    )
+    parser.add_argument(
+        '--ids-file',
+        help='Path to a file containing question IDs to process (one ID per line)'
+    )
+    parser.add_argument(
+        "--responses-file",
+        help="File with the responses to be evaluated by the judge"
     )
     parser.add_argument(
         "--mode",
@@ -227,22 +225,23 @@ def main():
         input_file = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
         print(f"Using default: {input_file}")
 
+  
     # Handle ids file
     ids_file_path = args.ids_file
     ids = None
     if ids_file_path:
         with open(ids_file_path, "r") as f:
             ids = [line.strip() for line in f.readlines()]
-
+            
     # Load the selected prompts
-    system_path, user_path = default_prompts[args.prompt_type]
-
+    system_prompt_path, user_prompt_path = default_prompts[args.prompt_type]
+    
     # Override default prompts if provided
     if args.system_prompt:
         system_prompt_path = args.system_prompt
     if args.user_prompt:
         user_prompt_path = args.user_prompt
-
+        
     system_prompt = _load_prompt_fromfile(system_prompt_path)
     user_prompt = _load_prompt_fromfile(user_prompt_path)
 
@@ -250,9 +249,7 @@ def main():
     responses_file = None
     if args.prompt_type == "judge":
         responses_file = args.responses_file
-        prompt_formatter = prompt_types[args.prompt_type](
-            user_prompt, responses_filepath=responses_file
-        )
+        prompt_formatter = prompt_types[args.prompt_type](user_prompt, responses_filepath=responses_file)
     else:
         prompt_formatter = prompt_types[args.prompt_type](user_prompt)
 
@@ -268,8 +265,7 @@ def main():
         ids_filepath=ids_file_path,
     )
 
-
-# def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
+#def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
 #
 #    def payload_gen(situations):
 #        prompts_dict = {p["qid"]: p["prompt"] for p in prompts}
