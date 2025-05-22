@@ -27,6 +27,15 @@ def _load_prompt_fromfile(filename):
         raise IOError(f"Error reading system prompt file: {e}")
 
 
+def _load_model_options(options_file=None):
+    options_file = options_file or BASE_DIR / "ollama_model_options.json"
+    try:
+        with open(options_file) as in_file:
+            return json.load(in_file)
+    except IOError as e:
+        raise IOError(f"Error reading the model's options file {options_file}: {e}") from e
+
+
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -87,6 +96,12 @@ def parse_arguments():
         required=True,
         help='Path to text file containing auto-reply prompt'
     )
+
+    parser.add_argument(
+        '--model-options',
+        type=str,
+        help='Path to a JSON file containing model options'
+    )
     
     
     return parser.parse_args()
@@ -129,19 +144,17 @@ def main():
     # Load system prompt
     sys_prompt = None
     if args.sys_prompt:
-        sys_prompt = _load_prompt_fromfile(args.system_prompt)
+        sys_prompt = _load_prompt_fromfile(args.sys_prompt)
+    
+    # Load model options
+    model_options = _load_model_options(args.model_options)
     
     # Set up Ollama parameters
     ollama_params = {
         "model": args.model,
         "system": sys_prompt,
         "stream": True,
-        "options": {
-            "num_ctx": 10240,
-            "temperature": 0.1,
-            "num_predict": 2048,
-            "seed": SEED,
-        },
+        "options": model_options,
     }
 
     # Create Ollama client
