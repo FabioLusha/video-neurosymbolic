@@ -311,30 +311,51 @@ def generate_frames(video_dir, video_info=None, num_frames=10):
             print(f"Warning: Video {video_id}.mp4 not found in {video_dir}")
             continue
 
-        # Extract frames from video within specified time range
-        temp_dir, frame_paths = extract_frames(
-            video_path, 
-            num_frames,
-            start_time=start_time,
-            end_time=end_time
-        )
-        
-        # Convert frames to base64
-        b64_encodings = []
-        for i, frame_path in enumerate(frame_paths):
-            with open(frame_path, "rb") as f:
-                img_bytes = f.read()
-                b64_encodings.append(
-                    {
-                        "frame_id": i,
-                        "encoding": base64.b64encode(img_bytes).decode("utf-8"),
-                    }
-                )
+        try:
+            # Extract frames from video within specified time range
+            temp_dir, frame_paths = extract_frames(
+                video_path, 
+                num_frames,
+                start_time=start_time,
+                end_time=end_time
+            )
+            
+            # Convert frames to base64
+            b64_encodings = []
+            for i, frame_path in enumerate(frame_paths):
+                if not os.path.exists(frame_path):
+                    print(f"Warning: Frame {i} was not extracted successfully, skipping")
+                    continue
+                    
+                try:
+                    with open(frame_path, "rb") as f:
+                        img_bytes = f.read()
+                        b64_encodings.append(
+                            {
+                                "frame_id": i,
+                                "encoding": base64.b64encode(img_bytes).decode("utf-8"),
+                            }
+                        )
+                except Exception as e:
+                    print(f"Error reading frame {i}: {str(e)}")
+                    continue
 
-        # Clean up temporary files
-        shutil.rmtree(temp_dir)
+            # Only yield if we have at least one valid frame
+            if b64_encodings:
+                yield {**video_metadata, 'frames': b64_encodings}
+            else:
+                print(f"Warning: No valid frames were extracted for video {video_id}")
 
-        yield {**video_metadata, 'frames': b64_encodings}
+        except Exception as e:
+            print(f"Error processing video {video_id}: {str(e)}")
+            continue
+        finally:
+            # Clean up temporary files
+            if 'temp_dir' in locals():
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as e:
+                    print(f"Warning: Error cleaning up temporary directory: {str(e)}")
 
 def extract_frame_description(text):
     """
