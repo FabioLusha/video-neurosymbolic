@@ -89,8 +89,7 @@ def run_with_prompts(
             reply = _load_prompt_fromfile(args.reply_file)
         else:
             raise ValueError(
-                "You have chosen chat mode prompting but haven't provided any reply"
-                "prompt. Pass the reply prompt thorugh the parameter --reply-file")
+                "Chat mode requires a reply prompt file. Please provide one using the --reply-file parameter.")
         if args.task == "vqa":
             # TODO: Implement the feature and remove the print
             print("This feature is not implemented yet!!!")
@@ -102,6 +101,9 @@ def run_with_prompts(
             batch_processor.batch_automatic_chat_reply(
                 ollama_client, prompts, reply, output_file_path=output_filepath
             )
+    else:
+        print("Error: You must select one of the available modes: 'generate' or 'chat'")
+        return
 
 def main():
     # Define available prompt types and their corresponding formatter classes
@@ -197,6 +199,7 @@ def main():
         "--mode",
         choices=["generate", "chat"],
         help="How to run the model, 'chat' or 'generate' mode",
+        default="generate"
     )
     parser.add_argument(
         "--reply-file",
@@ -228,7 +231,9 @@ def main():
     if args.user_prompt:
         user_prompt_path = args.user_prompt
         
+    print(f"Loading system prompt from: {system_prompt_path}")
     system_prompt = _load_prompt_fromfile(system_prompt_path)
+    print(f"Loading user prompt from: {user_prompt_path}")
     user_prompt = _load_prompt_fromfile(user_prompt_path)
 
     # Special handling for judge prompt type
