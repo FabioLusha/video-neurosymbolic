@@ -1,0 +1,9 @@
+Q: {question}
+
+Alternatives:
+{c1}
+{c2}
+{c3}
+{c4}
+
+A:

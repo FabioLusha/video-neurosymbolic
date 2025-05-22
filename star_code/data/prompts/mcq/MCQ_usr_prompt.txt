@@ -1,0 +1,8 @@
+Q: {question}
+Alternatives:
+A. {c1}
+B. {c2}
+C. {c3}
+D. {c4}
+STSG: {stsg}
+A:
