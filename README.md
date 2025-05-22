@@ -150,8 +150,8 @@ Run the graph generation pipeline:
 python star_code/src/graph_gen.py \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
-  --video-dir star_code/data/datasets/shared/action-genome/Charades_v1_480 \
-  --videos-metadata star_code/data/datasets/shared/STAR/STAR_annotations/STAR_val.json \
+  --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
+  --videos-metadata star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
   --output-file outputs/generated_stsg.jsonl \
   --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
   --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
