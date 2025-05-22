@@ -12,8 +12,9 @@ A comprehensive toolkit for generating and understanding spatio-temporal scene g
 ## TODO
 
 - [ ] Add Ollama options config file to be passed as argument
-- [ ] Add functionality to pass system/user/reply prompts from arguments
+- [x] Add functionality to pass system/user/reply prompts from arguments
 - [ ] Support for batch processing of multiple videos
+- [ ] Add documentation with examples of prompt specifications for each prompt type
 
 ## Overview
 
@@ -97,7 +98,7 @@ Run the graph generation pipeline:
 
 ```bash
 python star_code/src/graph_gen.py \
-  --model gemma3:4b \
+  --model gemma3:4b-it-qat \
   --video-dir /multiverse/datasets/shared/action-genome/Charades_v1_480 \
   --videos-metadata /multiverse/datasets/shared/STAR/STAR_annotations/STAR_val.json \
   --output-file outputs/generated_stsg.jsonl \
@@ -113,7 +114,7 @@ Process generated STSGs for question answering:
 ```bash
 python star_code/src/main.py \
   --task graph-understanding \
-  --model gemma3:4b \
+  --model gemma3:4b-it-qat \
   --prompt-type mcq_zs_cot \
   --mode chat \
   --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
@@ -121,6 +122,32 @@ python star_code/src/main.py \
   --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
   --output-file gemma3_4b_qa.jsonl
 ```
+
+> **Note**: You can customize the prompts by using `--usr-prompt` and `--system-prompt` arguments. If not specified, default prompts will be used. To disable the system prompt, pass an empty string `""` to `--system-prompt`.
+
+## Some useful commands for ollama
+
+Here are some useful commands for managing Ollama in the containerized environment:
+
+```bash
+# List all available models
+docker exec ${USER}_ollama ollama list
+
+# Pull a new model (e.g., gemma3:4b-it-qat)
+docker exec ${USER}_ollama ollama pull gemma3:4b-it-qat
+
+# Remove a model
+docker exec ${USER}_ollama ollama rm gemma3:4b-it-qat
+
+# Show model information
+docker exec ${USER}_ollama ollama show gemma3:4b-it-qat
+
+# Run a model in interactive mode
+docker exec -it ${USER}_ollama ollama run gemma3:4b-it-qat
+```
+
+> **Note**: `${USER}` should replace your username or the actual container name if different. The container name follows the pattern `username_ollama` as defined in the Docker Compose configuration.
+
 
 ## Project Structure
 
@@ -139,6 +166,7 @@ python star_code/src/main.py \
 ├── dev_container/              # Development environment
 └── requirements.txt           # Python dependencies
 ```
+
 
 ## Graph Generation Module
 
@@ -203,7 +231,7 @@ python star_code/src/generate_graphs.py \
 | Argument | Description |
 |----------|-------------|
 | `--task` | Task type: `graph-understanding` (default) |
-| `--prompt-type` | **(Required)** Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
+| `--prompt-type` | Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
 | `--model` | Ollama model to use |
 | `--input-file` | Dataset file containing questions (JSON format) |
 | `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset (JSONL format)|
@@ -212,6 +240,8 @@ python star_code/src/generate_graphs.py \
 | `--responses-file` | File with responses for evaluation by the judge (used with `judge` prompt type) |
 | `--mode` | Run mode: `generate` (one-shot responses) or `chat` (conversation with reply) |
 | `--reply-file` | File with text for automatic follow-up in chat mode |
+| `--usr-prompt` | Path to file containing custom user prompt. If not specified, default prompt will be used |
+| `--system-prompt` | Path to file containing custom system prompt. Pass empty string `""` to disable system prompt. If not specified, default prompt will be used |
 
 ### Prompt Types
 
@@ -221,6 +251,8 @@ python star_code/src/generate_graphs.py \
 - `mcq_zs_cot`: Multiple-choice with zero-shot chain-of-thought reasoning
 - `bias_check`: Questions without scene graphs to check model bias
 - `judge`: LLM-as-judge evaluation of previous responses
+
+> **Important**: When providing custom user prompts via `--usr-prompt`, ensure they follow the format and requirements of the selected `--prompt-type`. Each prompt type has specific formatting needs and expected input/output structures that must be respected for proper functioning.
 
 ### Usage Example
 
