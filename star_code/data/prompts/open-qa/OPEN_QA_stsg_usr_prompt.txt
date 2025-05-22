@@ -1,1 +1,2 @@
-    prompt_format = "QUESTION: {question}\n" "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
+QUESTION: {question}
+SPATIO-TEMPORAL SCENE-GRAPH:
