@@ -22,12 +22,13 @@ def _load_prompt_fromfile(filename):
     except IOError as e:
         raise IOError(f"Error reading prompt file: {e}")
 
-def _load_model_options():
+def _load_model_options(options_file=None):
+    options_file = options_file or BASE_DIR / "ollama_model_options.json"
     try:
-        with open(BASE_DIR / "src/ollama_model_options.json") as in_file:
+        with open(options_file) as in_file:
             return json.load(in_file)
     except IOError as e:
-        raise IOError(f"Error reading the model's options file: {e}") from e
+        raise IOError(f"Error reading the model's options file {options_file}: {e}") from e
 
 def run_with_prompts(
     args,
@@ -39,6 +40,9 @@ def run_with_prompts(
     ids_filepath=None,
     output_filepath=None,
 ):
+    # Load model options
+    model_options = _load_model_options(args.model_options)
+    
     # Initialize Ollama manager
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     ollama_client = OllamaRequestManager(
@@ -47,12 +51,7 @@ def run_with_prompts(
             "model": model_name,
             "system": system_prompt,
             "stream": True,
-            "options": {
-                "num_ctx": 10240,
-                "temperature": 0.1,
-                "num_predict": 2048,
-                "seed": SEED,
-            },
+            "options": model_options,
         },
     )
 
@@ -164,7 +163,7 @@ def main():
         help="Type of prompt to use",
     )
     parser.add_argument(
-        "--system-prompt",
+        "--sys-prompt",
         help="Optional system prompt (overrides default). Use empty string for no system prompt.")
     parser.add_argument(
         "--user-prompt",
@@ -174,6 +173,10 @@ def main():
         "--model",
         help="Which model to use from those available in Ollama",
         required=True
+    )
+    parser.add_argument(
+        "--model-options",
+        help="Path to a JSON file containing model options"
     )
     parser.add_argument(
         "--input-file",
@@ -216,6 +219,7 @@ def main():
 
   
     # Handle ids file
+    # TODO: Add support for ids file
     ids_file_path = args.ids_file
     ids = None
     if ids_file_path:
@@ -226,14 +230,12 @@ def main():
     system_prompt_path, user_prompt_path = default_prompts[args.prompt_type]
     
     # Override default prompts if provided
-    if args.system_prompt:
-        system_prompt_path = args.system_prompt
+    if args.sys_prompt:
+        system_prompt_path = args.sys_prompt
     if args.user_prompt:
         user_prompt_path = args.user_prompt
-        
-    print(f"Loading system prompt from: {system_prompt_path}")
+
     system_prompt = _load_prompt_fromfile(system_prompt_path)
-    print(f"Loading user prompt from: {user_prompt_path}")
     user_prompt = _load_prompt_fromfile(user_prompt_path)
 
     # Special handling for judge prompt type
