@@ -8,18 +8,18 @@ services:
     container_name: ${USER}_pydev_env
     env_file:
       - .env
-    user: "1142:1142"
+    user: "${USER}:${USER}"
     stdin_open: true  # same as -i
     tty: true         # same as -t
     command: /bin/bash
     ports: # HOST:CONTAINER
       - "10882:8888"
     volumes:
-      - /home/lusha/storage:/home/lusha
-      - /multiverse/datasets/lusha:/home/lusha/star_code/data/datasets
-      - /multiverse/datasets/shared/action-genome:/home/lusha/star_code/data/datasets/action-genome
-      - /multiverse/datasets/shared/charades/Charades_v1_480:/home/lusha/star_code/data/datasets/action-genome/Charades_v1_480
-      - /multiverse/datasets/shared/STAR:/home/lusha/star_code/data/datasets/STAR
+      - ../:/home/${USER}
+      - ../star_code/data/datasets:/home/${USER}/star_code/data/datasets
+      - /multiverse/datasets/shared/action-genome:/home/${USER}/star_code/data/datasets/action-genome
+      - /multiverse/datasets/shared/action-genome/Charades_v1_480:/home/${USER}/star_code/data/datasets/action-genome/Charades_v1_480
+      - /multiverse/datasets/shared/STAR:/home/${USER}/star_code/data/datasets/STAR
     deploy:
       resources:
         reservations:
