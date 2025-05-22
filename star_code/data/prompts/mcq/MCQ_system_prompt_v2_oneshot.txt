@@ -27,7 +27,7 @@ STSG: [['person - on_the_side_of - clothes'], ['person - in_front_of - clothes']
 
 
 YOUR RESPONSE EXAMPLE:
-This space is reserved for your reasoning about the question.
+<This space is reserved for your reasoning about the question.>
 
 A: 2. The clothes.
 
