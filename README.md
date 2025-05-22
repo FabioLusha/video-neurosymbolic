@@ -11,7 +11,7 @@ A comprehensive toolkit for generating and understanding spatio-temporal scene g
 
 ## TODO
 
-- [ ] Add Ollama options config file to be passed as argument
+- [x] Add Ollama options config file to be passed as argument
 - [x] Add functionality to pass system/user/reply prompts from arguments
 - [ ] Support for batch processing of multiple videos
 - [ ] Add documentation with examples of prompt specifications for each prompt type
@@ -52,7 +52,7 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 
 2. Run the Ollama container:
    ```bash
-   docker compose -f ollama/ollama-compose.yaml up
+   docker compose -f ollama/ollama-compose.yaml up -d
    ```
 
 ### Development Environment
@@ -112,7 +112,7 @@ Both modules use pre-configured prompts tailored for their specific tasks to ens
 
 3. Attach to the container:
    ```bash
-   docker exec -it <username>_pydev_env bash
+   docker exec -it ${USER}_pydev_env bash
    ```
 
 ### Configuration Details
@@ -352,7 +352,7 @@ python star_code/src/graph_gen.py \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
-  --videos-metadata star_code/data/datasets/shared/STAR/STAR_annotations/STAR_val.json \
+  --videos-metadata star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
   --output-file outputs/generated_stsg.jsonl \
   --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
   --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
