@@ -4,8 +4,8 @@ FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-devel
 # * Set your username and group names below *
 # ********************************************************
 
-ARG USERNAME=lusha
-ARG USER_UID=1142
+ARG USERNAME=$USER
+ARG USER_UID=$USER_GID
 ARG USER_GID=$USER_UID
 
 # ********************************************************
