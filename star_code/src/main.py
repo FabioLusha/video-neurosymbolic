@@ -13,19 +13,6 @@ from STAR_utils.visualization_tools import vis_utils
 
 SEED = 13471225022025
 
-MODELS = [
-    "llama3.2",
-    "llama3.1:8b",
-    "deepseek-r1:1.5b",
-    "deepseek-r1:7b",
-    "phi3:3.8b",
-    "gemma3:4b",
-    "gemma3:4b-it-q4_K_M",  # instruction tuned
-    "gemma3:4b-it-qat",  # it quantization aware training
-    "gemma3:12b",
-    "gemma3:27b",
-]
-
 BASE_DIR = Path(__file__).parent.parent
 
 def _load_prompt_fromfile(filename):
@@ -184,8 +171,8 @@ def main():
     )
     parser.add_argument(
         "--model",
-        choices=MODELS,
-        help="Which model to use",
+        help="Which model to use from those available in Ollama",
+        required=True
     )
     parser.add_argument(
         "--input-file",
