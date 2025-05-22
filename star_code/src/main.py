@@ -121,7 +121,7 @@ def main():
     default_prompts = {
         "open_qa": (
             BASE_DIR / "data/prompts/system_prompt.txt",
-            BASE_DIR / "data/prompts/OPEN_QA_stsg_usr_prompt.txt"
+            BASE_DIR / "data/prompts/open-qa/OPEN_QA_stsg_usr_prompt.txt"
         ),
         "mcq": (
             BASE_DIR / "data/prompts/mcq/MCQ_system_prompt_v2_oneshot.txt",
@@ -136,12 +136,12 @@ def main():
             BASE_DIR / "data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v2.txt"
         ),
         "bias_check": (
-            BASE_DIR / "data/prompts/system_prompt_bias_check.txt",
-            BASE_DIR / "data/prompts/MCQ_user_prompt_bias_check.txt"
+            BASE_DIR / "data/prompts/mcq/system_prompt_bias_check.txt",
+            BASE_DIR / "data/prompts/mcq/MCQ_user_prompt_bias_check.txt"
         ),
         "judge": (
-            BASE_DIR / "data/prompts/LLM_judge_system_v2.txt",
-            BASE_DIR / "data/prompts/LLM_judge_user_v2.txt"
+            BASE_DIR / "data/prompts/llm-as-jdudge/LLM_judge_system_v2.txt",
+            BASE_DIR / "data/prompts/llm-as-judge/LLM_judge_user_v2.txt"
         ),
         "vqa": (
             BASE_DIR / "data/prompts/img_answer/system_prompt.txt",
