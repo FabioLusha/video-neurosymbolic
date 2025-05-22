@@ -159,7 +159,6 @@ def main():
     parser.add_argument(
         "--prompt-type",
         choices=prompt_types.keys(),
-        required=True,
         help="Type of prompt to use",
     )
     parser.add_argument(
