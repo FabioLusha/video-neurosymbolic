@@ -294,12 +294,10 @@ class PromptDataset(Dataset):
         if video_id and video_id in self.stsgs:
             sample["stsg"] = self.stsgs[video_id]
 
-        prompt = self.prompt_formatter.format(sample)
-        return {
-            "qid": question_id,
-            "prompt": prompt,
-        }
+        sample['qid'] = sample['question_id']
+        sample['prompt'] = self.prompt_formatter.format(sample)
 
+        return sample 
 
 class STARDataset(PromptDataset):
 
@@ -386,7 +384,14 @@ class STARDataset(PromptDataset):
         question_id = sample[self.q_id_key]
         
         prompt = self.prompt_formatter.format(sample)
-        return {
-            "qid": question_id,
-            "prompt": prompt,
-        }
+        sample['prompt']
+        return prompt
+
+class CVRRDataset(PromptDataset):
+    
+    def preprocess(self):
+        for item in self.qa:
+            item['question_id'] = item.pop('unique_id')
+            item['question'] = item.pop('Q')
+            item['video_id'] = item.pop('video_path').split(".")[0]
+            item['answer'] = item.pop('A')

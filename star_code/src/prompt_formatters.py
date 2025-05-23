@@ -1,4 +1,5 @@
 import json
+import string
 
 
 class PromptFormatter:
@@ -16,7 +17,7 @@ class OpenEndedPrompt(PromptFormatter):
         args = dict()
 
         args['question'] = sample['question']
-        args['stsg'] = sample['stsg']
+        args['stsg'] = sample.get('stsg', None)
 
         return self.prompt_format.format(**args)
 
