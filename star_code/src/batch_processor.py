@@ -99,14 +99,19 @@ def stream_save(
 ):
     start_timestamp = datetime.now().strftime("%Y%m%d_%H:%M:%S")
 
+    orig_ofile = output_file_path
+    copy_counter = 1
     if output_file_path:
-        # Create directory if it doesn't exist
-        if os.path.exists(output_file_path):
-            raise FileExistsError(f"The file {output_file_path} already exists!")
+        # Check if file exists and find a new name if it does
+        base, ext = os.path.splitext(output_file_path)
+        
+        while os.path.exists(output_file_path):
+            output_file_path = f"{base}_copy{copy_counter}{ext}"
+            copy_counter +=1
 
         # Create directory if it doesn't exists
-        dir = os.path.dirname(output_file_path)
-        output_dir = dir if dir != "" or dir == None else "outputs"
+        output_dir = os.path.dirname(output_file_path)
+        output_dir = output_dir if output_dir != "" or output_dir == None else "outputs"
         os.makedirs(output_dir, exist_ok=True)
 
     else:
@@ -139,6 +144,8 @@ def stream_save(
         # where each json object is saved in one line
         log_file_path = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
+    if copy_counter > 1:
+        print(f"File {orig_ofile} already exists!\r")
     print(f"Responses will be saved to: {output_file_path}")
     print(f"Errors will be logged to: {log_file_path}")
 

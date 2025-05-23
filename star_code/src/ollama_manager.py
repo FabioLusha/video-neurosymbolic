@@ -381,11 +381,10 @@ class STARDataset(PromptDataset):
             raise IndexError
 
         sample = self.qa[idx]
-        question_id = sample[self.q_id_key]
-        
-        prompt = self.prompt_formatter.format(sample)
-        sample['prompt']
-        return prompt
+
+        sample['qid'] = sample[self.q_id_key] # question_id
+        sample['prompt'] = self.prompt_formatter.format(sample)
+        return sample
 
 class CVRRDataset(PromptDataset):
     
@@ -395,3 +394,25 @@ class CVRRDataset(PromptDataset):
             item['question'] = item.pop('Q')
             item['video_id'] = item.pop('video_path').split(".")[0]
             item['answer'] = item.pop('A')
+
+class JudgeDataset(PromptDataset):
+
+    def __init__(
+        self,
+        prompt_dataset,
+        predictions_filepath,
+        prompt_formatter
+    ):
+        self.base_dataset = prompt_dataset
+        self.predictions = {}
+        data = self.load_jsons(predictions_filepath)
+        for pred in data:
+            key = pred.get('qid', None)
+            if key is None:
+                key = pred.get('question_id')
+
+            self.predictions[key] = pred
+
+        # Ovveride the original prompt_formatter with that of the LLM as a Judge
+        prompt_dataset.prompt_formatter = prompt_formatter
+        
