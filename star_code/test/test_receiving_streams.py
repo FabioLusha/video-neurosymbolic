@@ -16,7 +16,7 @@ import batch_processor as bp
 import ollama_manager as om
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager  # noqa: E402
-from ollama_manager import PromptDataset
+from prompt_datasets import PromptDataset
 
 
 class StreamingReceiverTestUnit(unittest.TestCase):

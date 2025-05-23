@@ -6,7 +6,8 @@ import batch_processor
 import prompt_formatters as pf
 from _const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
-from ollama_manager import CVRRDataset, OllamaRequestManager, STARDataset
+from prompt_datasets import CVRRDataset, STARDataset
+from ollama_manager import OllamaRequestManager
 from STAR_utils.visualization_tools import vis_utils
 
 

@@ -9,7 +9,7 @@ import pytest
 sys.path.append("../src")
 
 import prompt_formatters as pf
-from ollama_manager import PromptDataset
+from prompt_datasets import PromptDataset
 
 
 class TestPromptDataset(unittest.TestCase):

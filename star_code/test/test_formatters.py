@@ -84,19 +84,12 @@ class PromptFormatterTest(unittest.TestCase):
         gt_prompt = prompt_format.format(
             question=question, gt_answer=answer, prediction=pred
         )
+        self.sample["answer"] = self.sample["choices"][str(self.sample["answer"])]
+        self.sample["response"] = pred
+        formatter = pf.LlmAsJudgePrompt(prompt_format)
+        test_prompt = formatter.format(self.sample)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=".jsonl", delete=True
-        ) as temp_file:
-            # Write some content to the file
-            data = {"qid": self.sample["question_id"], "response": pred}
-            json.dump(data, temp_file)
-
-            temp_file.seek(0)
-            formatter = pf.LlmAsJudgePrompt(prompt_format, temp_file.name)
-            test_prompt = formatter.format(self.sample)
-
-            self.assertEqual(gt_prompt, test_prompt)
+        self.assertEqual(gt_prompt, test_prompt)
 
 
 if __name__ == "__main__":

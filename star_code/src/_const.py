@@ -52,9 +52,8 @@ PROMPT_TYPES = {
 }
 
 # Task types
-TASK_TYPES = {"graph-gen": 0, "vqa": 0, "graph-understanding": 0}
+TASK_TYPES = {"graph-gen": 0, "llm-judge": 0, "vqa": 0, "graph-understanding": 0}
 
 # Default paths
 DEFAULT_INPUT_FILE = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"
 DEFAULT_MODEL_OPTIONS = BASE_DIR / "ollama_model_options.json"
-

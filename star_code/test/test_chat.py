@@ -13,7 +13,8 @@ import prompt_formatters as pf  # noqa: E402
 from chat_utils import ChatServer
 
 # noqa: E402 - disables warning for this line
-from ollama_manager import OllamaRequestManager, PromptDataset
+from prompt_datasets import PromptDataset
+from ollama_manager import OllamaRequestManager
 
 
 class TestChatService(unittest.TestCase):
