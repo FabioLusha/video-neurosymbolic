@@ -85,7 +85,7 @@ class LlmAsJudgePrompt(PromptFormatter):
         qid = sample['question_id']
 
         args['question'] = sample['question']
-        args['gt_answer'] = sample['choices'][str(sample['answer'])]
+        args['gt_answer'] = sample['answer']
 
         args['prediction'] = self.predictions[qid]['response']
 
@@ -115,11 +115,12 @@ class LlmAsJudgePromptForMCQ(LlmAsJudgePrompt):
         qid = sample['question_id']
 
         args['question'] = sample['question']
-
-        args['c1'] = sample['choices']['0']
-        args['c2'] = sample['choices']['1']
-        args['c3'] = sample['choices']['2']
-        args['c4'] = sample['choices']['3']
+        
+        if sample.get('choices', None):
+            args['c1'] = sample['choices']['0']
+            args['c2'] = sample['choices']['1']
+            args['c3'] = sample['choices']['2']
+            args['c4'] = sample['choices']['3']
 
         args['gt_answer'] = sample['choices'][str(sample['answer'])]
         args['prediction'] = self.predictions[qid]['response']

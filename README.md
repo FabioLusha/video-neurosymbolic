@@ -8,6 +8,7 @@ A comprehensive toolkit for generating and understanding spatio-temporal scene g
 - Process existing scene graphs for question answering and reasoning
 - Compatible with various LLMs through Ollama
 - Configurable prompting strategies for different tasks
+- Support for multiple dataset types (STAR and CVRR)
 
 ## TODO
 
@@ -156,27 +157,45 @@ python star_code/src/graph_gen.py \
   --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
   --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
   --max-samples 5
-
 ```
 
 ### Graph Understanding
 
 Process generated STSGs for question answering:
 
+#### Using STAR Dataset
 ```bash
+# Run open-ended QA with chain-of-thought reasoning in chat mode
 python star_code/src/main.py \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --prompt-type mcq_zs_cot \
   --mode chat \
+  --dataset-type star \
   --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
   --stsg-file star_code/data/datasets/STAR_QA_and_stsg_val.json \
   --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
-  --output-file gemma3_4b_qa.jsonl
+  --output-file gemma3_4b_qa.jsonl 
 ```
 
-> **Note**: You can customize the prompts by using `--usr-prompt` and `--sys-prompt` arguments. If not specified, default prompts will be used. To disable the system prompt, pass an empty string `""` to `--sys-prompt`. Model options can be customized through the `--model-options` argument, which should point to a JSON file containing the desired parameters. If not specified, it will look for `ollama_model_options.json` in the base directory.
+#### CVRR Dataset
+The CVRR dataset contains only open-ended questions, so it should be used with the `open_qa` prompt type. Here's an example:
+
+```bash
+# Run open-ended questions on the CVRR dataset
+python star_code/src/main.py \
+  --task graph-understanding \
+  --model gemma3:4b-it-qat \
+  --model-options star_code/ollama_model_options.json \
+  --prompt-type open_qa \
+  --mode chat \
+  --dataset-type cvrr \
+  --input-file star_code/data/datasets/CVRR/annotations.json \
+  --stsg-file star_code/data/datasets/CVRR/scene_graphs.jsonl \
+  --reply-file star_code/data/prompts/open-qa/auto_reply.txt \
+  --output-file cvrr_qa_responses.jsonl
+```
 
 ## Some useful commands for ollama
 
@@ -201,7 +220,6 @@ docker exec -it ${USER}_ollama ollama run gemma3:4b-it-qat
 
 > **Note**: `${USER}` should replace your username or the actual container name if different. The container name follows the pattern `username_ollama` as defined in the Docker Compose configuration.
 
-
 ## Project Structure
 
 ```
@@ -219,7 +237,6 @@ docker exec -it ${USER}_ollama ollama run gemma3:4b-it-qat
 ├── dev_container/              # Development environment
 └── requirements.txt           # Python dependencies
 ```
-
 
 ## Graph Generation Module
 
@@ -291,6 +308,7 @@ python star_code/src/graph_gen.py \
 | `--task` | Task type: `graph-understanding` (default) |
 | `--prompt-type` | Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
 | `--model` | Ollama model to use |
+| `--dataset-type` | **(Required)** Type of dataset to use: `star` or `cvrr` |
 | `--input-file` | Dataset file containing questions (JSON format) |
 | `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset (JSONL format)|
 | `--output-file` | File path to save model responses |
@@ -313,8 +331,9 @@ python star_code/src/graph_gen.py \
 
 > **Important**: When providing custom user prompts via `--usr-prompt`, ensure they follow the format and requirements of the selected `--prompt-type`. Each prompt type has specific formatting needs and expected input/output structures that must be respected for proper functioning.
 
-### Usage Example
+### Usage Examples
 
+#### STAR Dataset
 ```bash
 # Run open-ended QA with chain-of-thought reasoning in chat mode
 python star_code/src/main.py \
@@ -323,23 +342,29 @@ python star_code/src/main.py \
   --model-options star_code/ollama_model_options.json \
   --prompt-type mcq_zs_cot \
   --mode chat \
+  --dataset-type star \
   --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
   --stsg-file star_code/data/datasets/STAR_QA_and_stsg_val.json \
   --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
   --output-file gemma3_4b_qa.jsonl 
 ```
 
-### Additional Examples
+#### CVRR Dataset
+The CVRR dataset contains only open-ended questions, so it should be used with the `open_qa` prompt type. Here's an example:
 
 ```bash
-# Run multiple-choice questions on the validation dataset
+# Run open-ended questions on the CVRR dataset
 python star_code/src/main.py \
   --task graph-understanding \
-  --model gemma3:4b \
-  --prompt-type mcq \
-  --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
-  --stsg-file star_code/data/datasets/STAR_QA_and_stsg_val.json \
-  --output-file results/mcq_responses.json
+  --model gemma3:4b-it-qat \
+  --model-options star_code/ollama_model_options.json \
+  --prompt-type open_qa \
+  --mode chat \
+  --dataset-type cvrr \
+  --input-file star_code/data/datasets/CVRR/annotations.json \
+  --stsg-file star_code/data/datasets/CVRR/scene_graphs.jsonl \
+  --reply-file star_code/data/prompts/open-qa/auto_reply.txt \
+  --output-file cvrr_qa_responses.jsonl
 ```
 
 ## Complete Workflow Example
@@ -367,6 +392,7 @@ python star_code/src/main.py \
   --model-options star_code/ollama_model_options.json \
   --prompt-type mcq_zs_cot \
   --mode chat \
+  --dataset-type star \
   --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
   --stsg-file outputs/generated_stsg.jsonl \
   --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
