@@ -5,8 +5,6 @@ from datetime import datetime
 
 import requests
 
-from ollama_manager import Result
-
 
 class Pipeline:
 

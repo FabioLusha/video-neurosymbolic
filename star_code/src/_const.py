@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-import prompt_formatters as pf
+from . import prompt_formatters as pf
 
 # Base directory and environment variables
 BASE_DIR = Path(__file__).parent.parent
@@ -31,7 +31,7 @@ DEFAULT_PROMPTS = {
         BASE_DIR / "data/prompts/mcq/MCQ_user_prompt_bias_check.txt",
     ),
     "judge": (
-        BASE_DIR / "data/prompts/llm-as-jdudge/LLM_judge_system_v2.txt",
+        BASE_DIR / "data/prompts/llm-as-judge/LLM_judge_system_v2.txt",
         BASE_DIR / "data/prompts/llm-as-judge/LLM_judge_user_v2.txt",
     ),
     "vqa": (
@@ -52,7 +52,7 @@ PROMPT_TYPES = {
 }
 
 # Task types
-TASK_TYPES = {"graph-gen": 0, "llm-judge": 0, "vqa": 0, "graph-understanding": 0}
+TASK_TYPES = {"graph-gen": 0, "llm-judge": 1, "vqa": 2, "graph-understanding": 3}
 
 # Default paths
 DEFAULT_INPUT_FILE = BASE_DIR / "data/datasets/STAR/STAR_annotations/STAR_val.json"

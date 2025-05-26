@@ -9,8 +9,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-import batch_processor
-from ollama_manager import OllamaRequestManager
+from . import batch_processor
+from .ollama_manager import OllamaRequestManager
 
 SEED = 13471225022025
 

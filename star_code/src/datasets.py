@@ -22,8 +22,7 @@ class PromptDataset(Dataset):
         self.qa = self._load_qa_file()
 
         # Get question ID key (auto-detect between 'qid' and 'question_id')
-        if len(self.qa) > 0:
-            self.q_id_key = "qid" if "qid" in self.qa[0] else "question_id"
+        self.q_id_key = self.get_id_key()
         # Set in _load_stsg_data
         self.stsg_id_key = None
         # Filter by IDs if provided
@@ -41,6 +40,12 @@ class PromptDataset(Dataset):
 
         self.preprocess()
         self.print_stats()
+
+    def get_id_key(self):
+        if len(self.qa) > 0:
+            return "qid" if "qid" in self.qa[0] else "question_id"
+
+        raise ValueError("Coulnd't identify the key to access the question id")
 
     def print_stats(self):
         """Print statistics about the dataset."""
@@ -240,6 +245,14 @@ class STARDataset(PromptDataset):
 
 class CVRRDataset(PromptDataset):
 
+    def get_id_key(self):
+        try:
+            key = super().get_id_key()
+            if not key:
+                return None
+        except:
+            return "Q"
+
     def preprocess(self):
         for item in self.qa:
             item["question_id"] = item.pop("unique_id")
@@ -255,16 +268,14 @@ class JudgeDataset(PromptDataset):
 
         data = self.load_jsons(predictions_filepath)
         predictions = {}
+        key_name = "qid" if data[0].get("qid", None) else "question_id"
         for pred in data:
-            key = pred.get("qid", None)
-            if key is None:
-                key = pred.get("question_id")
+            predictions[pred[key_name]] = pred
 
-            predictions[key] = pred
 
         for sample in self.qa:
             sample["gt_answer"] = sample["answer"]
-            sample["response"] = predictions[sample["question_id"]]
+            sample["response"] = predictions[sample["question_id"]]["response"]
 
         self._wrapped.prompt_formatter = prompt_formatter
 

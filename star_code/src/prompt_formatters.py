@@ -1,7 +1,3 @@
-import json
-import string
-
-
 class PromptFormatter:
 
     def __init__(self, prompt_format):

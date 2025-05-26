@@ -1,22 +1,16 @@
 import argparse
 import json
+from os import system
 from pathlib import Path
 
-import batch_processor
-import prompt_formatters as pf
-from _const import (
-    BASE_DIR,
-    DEFAULT_INPUT_FILE,
-    DEFAULT_MODEL_OPTIONS,
-    DEFAULT_PROMPTS,
-    OLLAMA_URL,
-    PROMPT_TYPES,
-    TASK_TYPES,
-)
-from ollama_manager import OllamaRequestManager
-from STAR_utils.visualization_tools import vis_utils
-
+# relative imports work only with the 'from' form of the import
+from . import batch_processor
+from . import prompt_formatters as pf
+from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
+                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
+from .ollama_manager import OllamaRequestManager
+from .STAR_utils.visualization_tools import vis_utils
 
 
 def main():
@@ -37,10 +31,12 @@ def main():
     )
     parser.add_argument(
         "--sys-prompt",
-        help="Optional system prompt (overrides default). Use empty string for no system prompt.",
+        help="Optional system prompt (pass 'default' to use default system prompt).",
     )
     parser.add_argument(
-        "--user-prompt", help="Optional user prompt (overrides default)"
+        "--user-prompt",
+        help="User prompt (pass default to use 'defualt' prompt)",
+        required=True,
     )
     parser.add_argument(
         "--model",
@@ -83,7 +79,20 @@ def main():
     args = parser.parse_args()
 
     # Step 2: Load prompts
-    system_prompt, user_prompt = load_prompts(args)
+    # Load system and user prompts based on arguments.
+    system_prompt_path, user_prompt_path = DEFAULT_PROMPTS[args.prompt_type]
+
+    system_prompt = None
+    if args.sys_prompt:
+        if args.sys_prompt != "default":
+            system_prompt_path = args.sys_prompt
+        system_prompt = _load_prompt_fromfile(system_prompt_path)
+
+    # --user-prompt is a required argument
+    if args.user_prompt != "default":
+        user_prompt_path = args.user_prompt
+    user_prompt = _load_prompt_fromfile(user_prompt_path)
+
 
     # Step 3: Create prompt formatter
     prompt_formatter = create_prompt_formatter(args, user_prompt)
@@ -111,26 +120,8 @@ def main():
     process_prompts(ollama_client, prompts, args.mode, args, args.output_file)
 
 
-def load_prompts(args):
-    """Load system and user prompts based on arguments."""
-    system_prompt_path, user_prompt_path = DEFAULT_PROMPTS[args.prompt_type]
-
-    if args.sys_prompt:
-        system_prompt_path = args.sys_prompt
-    if args.user_prompt:
-        user_prompt_path = args.user_prompt
-
-    return _load_prompt_fromfile(system_prompt_path), _load_prompt_fromfile(
-        user_prompt_path
-    )
-
-
 def create_prompt_formatter(args, user_prompt):
     """Create the appropriate prompt formatter based on arguments."""
-    if args.prompt_type == "judge":
-        return PROMPT_TYPES[args.prompt_type](
-            user_prompt, responses_filepath=args.responses_file
-        )
     return PROMPT_TYPES[args.prompt_type](user_prompt)
 
 
@@ -188,8 +179,9 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
     else:
         raise ValueError(f"Unknown dataset type: {args.dataset_type}")
 
-    if args.task_type == TASK_TYPES["llm-judge"]:
-        dataset = JudgeDataset(dataset, args.response_file, prompt_formatter)
+    if args.task == "llm-judge":
+        print("=== Loading judge type dataset")
+        dataset = JudgeDataset(dataset, args.responses_file , prompt_formatter)
 
     return dataset
 
