@@ -148,7 +148,7 @@ This volume mapping allows you to reuse existing model files across container re
 Run the graph generation pipeline:
 
 ```bash
-python star_code/src/graph_gen.py \
+python -m star_code.src.graph_gen \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
@@ -166,7 +166,7 @@ Process generated STSGs for question answering:
 #### Using STAR Dataset
 ```bash
 # Run open-ended QA with chain-of-thought reasoning in chat mode
-python star_code/src/main.py \
+python -m star_code.src.main \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
@@ -184,7 +184,7 @@ The CVRR dataset contains only open-ended questions, so it should be used with t
 
 ```bash
 # Run open-ended questions on the CVRR dataset
-python star_code/src/main.py \
+python -m star_code.src.main \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
@@ -305,7 +305,7 @@ python star_code/src/graph_gen.py \
 
 | Argument | Description |
 |----------|-------------|
-| `--task` | Task type: `graph-understanding` (default) |
+| `--task` | Task type: `graph-understanding` (default) or `llm-judge` (for evaluating responses) |
 | `--prompt-type` | Type of prompt template: `open_qa`, `mcq`, `mcq_html`, `mcq_zs_cot`, `bias_check`, `judge` |
 | `--model` | Ollama model to use |
 | `--dataset-type` | **(Required)** Type of dataset to use: `star` or `cvrr` |
@@ -313,7 +313,7 @@ python star_code/src/graph_gen.py \
 | `--stsg-file` | File with spatio-temporal scene graphs if not included in main dataset (JSONL format)|
 | `--output-file` | File path to save model responses |
 | `--ids-file` | Path to file with question IDs to process (one ID per line) |
-| `--responses-file` | File with responses for evaluation by the judge (used with `judge` prompt type) |
+| `--responses-file` | File with responses for evaluation by the judge (used with `llm-judge` task) |
 | `--mode` | Run mode: `generate` (one-shot responses) or `chat` (conversation with reply) |
 | `--reply-file` | File with text for automatic follow-up in chat mode |
 | `--usr-prompt` | Path to file containing custom user prompt. If not specified, default prompt will be used |
@@ -336,7 +336,7 @@ python star_code/src/graph_gen.py \
 #### STAR Dataset
 ```bash
 # Run open-ended QA with chain-of-thought reasoning in chat mode
-python star_code/src/main.py \
+python -m star_code.src.main \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
@@ -354,7 +354,7 @@ The CVRR dataset contains only open-ended questions, so it should be used with t
 
 ```bash
 # Run open-ended questions on the CVRR dataset
-python star_code/src/main.py \
+python -m star_code.src.main \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
@@ -367,13 +367,28 @@ python star_code/src/main.py \
   --output-file cvrr_qa_responses.jsonl
 ```
 
+#### LLM as a Judge Example
+
+```bash
+python -m star_code.src.main \
+  --task llm-judge \
+  --model gemma3:4b-it-qat \
+  --model-options star_code/ollama_model_options.json \
+  --prompt-type judge \
+  --user-prompt star_code/test/test_files/llm-judge/llm_as_judge_test_prompt.txt \
+  --dataset-type cvrr \
+  --input-file star_code/test/test_files/llm-judge/cvrr_qa.json \
+  --responses-file star_code/test/test_files/llm-judge/cvrr_response.json \
+  --output-file gemma3_4b_qa.jsonl
+```
+
 ## Complete Workflow Example
 
 This example shows how to use both modules together in a complete workflow:
 
 1. First, generate scene graphs from videos:
 ```bash
-python star_code/src/graph_gen.py \
+python -m star_code.src.graph_gen \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
@@ -386,7 +401,7 @@ python star_code/src/graph_gen.py \
 
 2. Then, use the generated graphs to answer questions:
 ```bash
-python star_code/src/main.py \
+python -m star_code.src.main \
   --task graph-understanding \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
@@ -399,10 +414,24 @@ python star_code/src/main.py \
   --output-file gemma3_4b_qa.jsonl 
 ```
 
+3. Finally, evaluate the responses using the LLM judge:
+```bash
+python -m star_code.src.main \
+  --task llm-judge \
+  --model gemma3:4b-it-qat \
+  --model-options star_code/ollama_model_options.json \
+  --prompt-type judge \
+  --dataset-type star \
+  --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
+  --responses-file gemma3_4b_qa.jsonl \
+  --output-file gemma3_4b_qa_evaluation.jsonl
+```
+
 ## Notes
 
 - Both modules use pre-defined prompts stored in the `data/prompts/` directory
 - Default datasets are located in `data/datasets/`
+- The toolkit is compatible with the `STAR` and `CVRR` benchmarks data structure
 - Responses are streamed for real-time monitoring
 - A fixed seed (13471225022025) is used for reproducibility
 - The Graph Generation module requires ffmpeg to be installed for video frame extraction
