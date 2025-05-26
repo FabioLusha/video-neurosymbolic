@@ -316,8 +316,8 @@ python star_code/src/graph_gen.py \
 | `--responses-file` | File with responses for evaluation by the judge (used with `llm-judge` task) |
 | `--mode` | Run mode: `generate` (one-shot responses) or `chat` (conversation with reply) |
 | `--reply-file` | File with text for automatic follow-up in chat mode |
-| `--usr-prompt` | Path to file containing custom user prompt. If not specified, default prompt will be used |
-| `--sys-prompt` | Path to file containing custom system prompt. Pass empty string `""` to disable system prompt. If not specified, default prompt will be used |
+| `--user-prompt` | **(Required)** Path to file containing user prompt. Pass 'default' to use the default prompt for the selected prompt type |
+| `--sys-prompt` | **(Optional)** Path to file containing system prompt. Pass 'default' to use the default system prompt, or omit to use no system prompt |
 | `--model-options` | **(Optional)** Path to JSON file containing model options |
 
 ### Prompt Types
