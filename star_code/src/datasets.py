@@ -250,8 +250,8 @@ class CVRRDataset(PromptDataset):
 
 class JudgeDataset(PromptDataset):
 
-    def __init__(self, prompt_dataset, predictions_filepath, prompt_formatter):
-        self._wrapped = prompt_dataset
+    def __init__(self, dataset, predictions_filepath, prompt_formatter):
+        self._wrapped = dataset
 
         data = self.load_jsons(predictions_filepath)
         predictions = {}

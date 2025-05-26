@@ -1,14 +1,16 @@
 import json
-import os
+import os, sys
+from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
 import requests
 
-sys.path.append("../src")
+# Add src directory to path FIRST (before other imports)
+src_path = str(Path(__file__).parent.parent / "src")
+sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
 
 import batch_processor
 import batch_processor as bp
@@ -16,7 +18,7 @@ import batch_processor as bp
 import ollama_manager as om
 import prompt_formatters as pf
 from ollama_manager import OllamaRequestManager  # noqa: E402
-from prompt_datasets import PromptDataset
+from datasets import PromptDataset
 
 
 class StreamingReceiverTestUnit(unittest.TestCase):

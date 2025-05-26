@@ -1,19 +1,22 @@
 import json
-import os
+import os, sys
+from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
-sys.path.append("../src")
+
+# Add src directory to path FIRST (before other imports)
+src_path = str(Path(__file__).parent.parent / "src")
+sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
 
 import batch_processor
 import prompt_formatters as pf  # noqa: E402
 from chat_utils import ChatServer
 
 # noqa: E402 - disables warning for this line
-from prompt_datasets import PromptDataset
+from datasets import PromptDataset
 from ollama_manager import OllamaRequestManager
 
 
