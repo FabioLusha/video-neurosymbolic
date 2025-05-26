@@ -1,0 +1,5 @@
+Q: {question}
+A: {gt_answer}
+P: {prediction}
+
+Judge instructions...

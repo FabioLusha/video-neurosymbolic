@@ -134,14 +134,13 @@ class PromptDataset(Dataset):
             raise IndexError
 
         sample = self.qa[idx]
-        question_id = sample.get(self.q_id_key)
         video_id = sample.get("video_id")
 
         # Add STSG to sample if available
         if video_id and video_id in self.stsgs:
             sample["stsg"] = self.stsgs[video_id]
 
-        sample["qid"] = sample["question_id"]
+        sample["qid"] = sample.get(self.q_id_key)
         sample["prompt"] = self.prompt_formatter.format(sample)
 
         return sample
@@ -191,45 +190,43 @@ class STARDataset(PromptDataset):
 
     def preprocess(self):
         """If a stsg file is specified, than filter out the qa without an stsg"""
-        filtered_qas = []
-        if self.stsg_file_path:
+        
+        if not self.stsg_file_path:
+            return
+        
+        if self.stsg_id_key == "question_id":
+            filtered_qas = []
             for sample in self.qa:
-                if self.stsg_id_key == "question_id":
-                    if isinstance(sample["choices"][0], dict):
-                        sample["stsg"] = self.stsgs[sample.get("question_id")]
-                        choices = {
-                            str(choice["choice_id"]): choice["choice"]
-                            for choice in sample["choices"]
-                        }
-                        sample["choices"] = choices
-                elif self.stsg_id_key == "video_id":
-                    video_id = sample.get("video_id")
-                    start = sample.get("start")
-                    end = sample.get("end")
-
-                    if video_id in self.stsgs:
-                        # Look inside all the sub-clip of the video for the one referenced
-                        # by the question (i.e. matching video_id, start, and end)
-                        for situation in self.stsgs[video_id]:
-                            if situation["start"] == start and situation["end"] == end:
-                                sample["stsg"] = situation["stsg"]
-
-                                # check if the choices attribute is a string or the dict
-                                # used in STAR
-                                if isinstance(sample["choices"][0], dict):
-                                    sample["choices"] = {
-                                        str(choice["choice_id"]): choice["choice"]
-                                        for choice in sample["choices"]
-                                    }
-
-                                filtered_qas.append(sample)
-                    else:
-                        # TODO: warn qa is not associated to a stsg
-                        continue
-        # self.qa updated with filtered_qas if filtered is not null
-        # i.e. 'question_id' => filtered_qas == [] --> (A => B) == (not A) or B
-        assert not (self.stsg_id_key == "question_id") or (filtered_qas == [])
-        self.qa = filtered_qas or self.qa
+                stsg = self.stsgs.get(sample.get("question_id"), None)
+                if not stsg:
+                    # TODO: warn qa is not associated to a stsg
+                    continue
+                
+                sample['stsg'] = stsg
+                filtered_qas.append(sample)
+                
+            self.qa = filtered_qas
+            
+        elif self.stsg_id_key == "video_id":
+            filtered_qas = []
+            for sample in self.qa:
+                video_id = sample.get("video_id")
+                start = sample.get("start")
+                end = sample.get("end")
+                
+                if video_id in self.stsgs:
+                    # Look inside all the sub-clip of the video for the one referenced
+                    # by the question (i.e. matching video_id, start, and end)
+                    for situation in self.stsgs[video_id]:
+                        if situation["start"] == start and situation["end"] == end:
+                            sample["stsg"] = situation["stsg"]
+                            filtered_qas.append(sample)
+                            break
+                else:
+                    # TODO: warn qa is not associated to a stsg
+                    continue
+                
+            self.qa = filtered_qas
         return
 
     def __getitem__(self, idx):
@@ -237,7 +234,16 @@ class STARDataset(PromptDataset):
             raise IndexError
 
         sample = self.qa[idx]
-
+        
+        # tranfrom the choices field, discrading the program etc
+        # need the check because the same element can be accessed
+        # multiple times and we are modifying the structure in place
+        if isinstance(sample["choices"], list):
+            sample["choices"] = {
+                str(choice["choice_id"]): choice["choice"]
+                for choice in sample["choices"]
+                }
+            
         sample["qid"] = sample[self.q_id_key]  # question_id
         sample["prompt"] = self.prompt_formatter.format(sample)
         return sample
