@@ -43,9 +43,14 @@ class PromptDataset(Dataset):
 
     def get_id_key(self):
         if len(self.qa) > 0:
-            return "qid" if "qid" in self.qa[0] else "question_id"
-
-        raise ValueError("Coulnd't identify the key to access the question id")
+            key = "qid" if "qid" in self.qa[0] else None
+            key = key or ("question_id" if "question_id" in self.qa[0] else None)
+            if key:
+                return key
+            else:
+                raise ValueError("Could not identify the key to access the question id")
+        return None
+            
 
     def print_stats(self):
         """Print statistics about the dataset."""
@@ -252,12 +257,8 @@ class STARDataset(PromptDataset):
 class CVRRDataset(PromptDataset):
 
     def get_id_key(self):
-        try:
-            key = super().get_id_key()
-            if not key:
-                return None
-        except:
-            return "Q"
+        # return question_id cause of the prepocessing
+        return "question_id"
 
     def preprocess(self):
         for item in self.qa:

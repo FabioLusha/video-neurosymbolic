@@ -189,11 +189,12 @@ python -m star_code.src.main \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --prompt-type open_qa \
-  --mode chat \
+  --sys-prompt star_code/data/prompts/open-qa/CVRR/sys_prompt.txt \
+  --user-prompt star_code/data/prompts/open-qa/CVRR/user_prompt.txt \
+  --mode generate \
   --dataset-type cvrr \
-  --input-file star_code/data/datasets/CVRR/annotations.json \
-  --stsg-file star_code/data/datasets/CVRR/scene_graphs.jsonl \
-  --reply-file star_code/data/prompts/open-qa/auto_reply.txt \
+  --input-file star_code/data/datasets/CVRR/cvrr_val_updated.json \
+  --stsg-file star_code/data/datasets/CVRR/generated_stsg_cvrr.json \
   --output-file cvrr_qa_responses.jsonl
 ```
 
