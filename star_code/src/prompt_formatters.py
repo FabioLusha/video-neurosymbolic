@@ -1,26 +1,49 @@
+import re
+from typing import Dict
+
+
 class PromptFormatter:
 
     def __init__(self, prompt_format):
         self.prompt_format = prompt_format
 
-    def format(self, sample):
+    def init_fields(self, sample) -> Dict[str, str]:
         pass
 
+    def validate_fields(self, fields):
+        pattern = r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}'
+        required_fields = set(re.findall(pattern, self.prompt_format))
+
+        if not required_fields:
+            return
+
+        missing_fields = required_fields - set(fields.keys())
+        if missing_fields:
+            missing_list = sorted(missing_fields)
+            raise ValueError(
+                f"Missing required format fields: {', '.join(missing_list)}"
+            )
+
+    def format(self, sample):
+        fields = self.init_fields(sample)
+        self.validate_fields(fields)
+
+        return self.prompt_format.format(**fields)
 
 class OpenEndedPrompt(PromptFormatter):
 
-    def format(self, sample):
+    def init_fields(self, sample):
         args = dict()
 
         args["question"] = sample["question"]
         args["stsg"] = sample.get("stsg", None)
 
-        return self.prompt_format.format(**args)
+        return args
 
 
 class MCQPrompt(PromptFormatter):
 
-    def format(self, sample):
+    def init_fields(self, sample):
         args = dict()
 
         args["question"] = sample["question"]
@@ -32,12 +55,12 @@ class MCQPrompt(PromptFormatter):
 
         args["stsg"] = str(sample["stsg"])
 
-        return self.prompt_format.format(**args)
+        return args
 
 
 class MCQPromptWoutSTSG(PromptFormatter):
 
-    def format(self, sample):
+    def init_fields(self, sample):
         args = dict()
 
         args["question"] = sample["question"]
@@ -48,12 +71,12 @@ class MCQPromptWoutSTSG(PromptFormatter):
         args["c3"] = sample["choices"]["2"]
         args["c4"] = sample["choices"]["3"]
 
-        return self.prompt_format.format(**args)
+        return args
 
 
 class LlmAsJudgePrompt(PromptFormatter):
 
-    def format(self, sample):
+    def init_fields(self, sample):
         args = dict()
 
         qid = sample["question_id"]
@@ -62,11 +85,11 @@ class LlmAsJudgePrompt(PromptFormatter):
         args["gt_answer"] = sample["answer"]
         args["prediction"] = sample["response"]
 
-        return self.prompt_format.format(**args)
+        return args
 
 
 class LlmAsJudgePromptForMCQ(LlmAsJudgePrompt):
-    def format(self, sample):
+    def init_fields(self, sample):
         args = dict()
 
         qid = sample["question_id"]
@@ -82,4 +105,4 @@ class LlmAsJudgePromptForMCQ(LlmAsJudgePrompt):
         args["gt_answer"] = sample["answer"]
         args["prediction"] = sample["response"]
 
-        return self.prompt_format.format(**args)
+        return args
