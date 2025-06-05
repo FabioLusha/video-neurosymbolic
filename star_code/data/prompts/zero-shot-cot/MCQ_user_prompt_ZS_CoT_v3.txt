@@ -1,0 +1,30 @@
+Please carefully read the following Spatio-Temporal Scene Graph delimited by the <STSG> tags and provide an answer to the question below:
+
+<STSG>
+{stsg}
+</STSG>
+
+Given the following question:
+<Q>
+{question}
+<Q>
+
+And the following alternatives:
+<Alternatives>
+A. {c1}
+B. {c2}
+C. {c3}
+D. {c4}
+</Alternatives>
+
+Provide an answer to the above question reasoning step by step on the Spatio-Temporal Scene-Graph (STSG) and choosing one of the alternatives. 
+
+In answering the question please be sure to operate according to the following guidlines:
+1. Question Interpretation: Clearly state what the question is asking
+2. STSG Analysis: Carefully examine the spatial and temporal relationships in the scene graph
+3. Alternative Evaluation: For each option (A, B, C, D), explain whether it matches the STSG evidence
+4. Reasoning: Provide clear logical step by step reasoning leading to your conclusion
+5. Conclusion: Declare the logical conclusion to your reasoning in the above step
+6. Consistency Check: Before finalizing, verify that your chosen answer directly follows from your analysis above and provide the final answer choosing one of the alternatives.
+
+CRITICAL INSTRUCTION: After completing your reasoning but before providing the final response, re-read your analysis carefully. Ensure your final answer choice is fully supported by and consistent with your reasoning. If you notice any contradiction, revise your analysis first.

@@ -1,6 +1,6 @@
 {
     "seed": 13471225022025,
-    "num_ctx": 10240,
+    "num_ctx": 20480,
     "temperature": 0.1,
     "num_predict": 2048
 }
