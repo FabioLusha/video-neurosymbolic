@@ -1,11 +1,8 @@
-# Video Question-Answering User Prompt Template
-
-## Question
+# Question
 {question}
 
-## Spatio-Temporal Scene Graph Representation
+# Spatio-Temporal Scene Graph Representation
 {stsg}
 
----
 
 Please analyze the provided scene graph representation and answer the question based on the visual and temporal information contained within it.

@@ -81,7 +81,7 @@ model_options = main._load_model_options(WORK_DIR / "ollama_model_options.json")
 
 sys_prompt = None
 ollama_params = {
-    "model": "gemma3:4b-it-qat",
+    "model": "gemma3:27b",
     "system": sys_prompt,
     "stream": True,
     "options": model_options
@@ -90,10 +90,10 @@ ollama_params = {
 url = os.environ.get("OLLAMA_URL", "http://lusha_ollama:11435")
 client = ollama_manager.OllamaRequestManager(url, ollama_params)
 
+# to filter prompts
+#prompts = prompts[]
 
-prompts = prompts[467:]
-
-OUT_FILE = WORK_DIR / 'outputs/sim_between_frames_v2_gemma3:4b-it-qat_20250604_10:19:00.jsonl'
+OUT_FILE = WORK_DIR / 'outputs/sim_between_frames_v2_gemma3:27b-it-qat_20250606_13:50:00.jsonl'
 batch_processor.batch_generate(
     client,
     prompts,
