@@ -143,7 +143,7 @@ def main():
 
             # remove duplicates and keeps only relevant metadata
             video_keyframes_info = extract_video_keyframes_info(args.keyframes_info)
-            video_info = preprocess_videos_metadata(video_info, video_keyframes_info)
+            video_info = preprocess_videos_metadata(video_info, video_keyframes_info, filter=False)
             print(f"=== Generating graphs for {len(video_info)} videos")
 
     url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -202,7 +202,7 @@ def extract_video_keyframes_info(csv_file_path):
     return video_keyframes_info
 
 
-def preprocess_videos_metadata(dataset, video_keyframes_info):
+def preprocess_videos_metadata(dataset, video_keyframes_info, filter=False):
     # We do not aggreagate the same keyframes for each video
     # indepenent of the quesiton because ideally each video should
     # be independent, i.e. each video_id with its keyframes determines
@@ -213,13 +213,13 @@ def preprocess_videos_metadata(dataset, video_keyframes_info):
     for data_point in dataset:
         video_id = data_point["video_id"]
         qid = data_point["question_id"]
-        keyframes = sorted(video_keyframes_info["keyframes"])
+        keyframes = sorted(video_keyframes_info[qid]["keyframes"])
 
-        if (video_id, ".".join(keyframes)) in seen:
+        if filter and (video_id, ".".join(keyframes)) in seen:
             continue
 
         seen.add((video_id, ".".join(keyframes)))
-        video_info.append({"video_id": video_id, "keyframes": keyframes})
+        video_info.append({"question_id": qid, "video_id": video_id, "keyframes": keyframes})
 
     return video_info
 
@@ -251,10 +251,12 @@ def generate_frames(frames_dir, video_info=None, num_frames=5):
             {"video_id": v.stem, "keyframes": [f.stem for f in list(v.glob("*.png"))]}
             for v in video_files
         ]
-
+    else:
+        video_info = video_info.copy()
+        
     for video_metadata in video_info:
         video_id = video_metadata["video_id"]
-        keyframes = sample_frames(video_metadata["keyframes"], num_frames)
+        keyframes = sample_frames(video_metadata.pop("keyframes"), num_frames)
 
         b64_encodings = []
         for i, keyframe in enumerate(keyframes):
@@ -341,9 +343,64 @@ def frame_aggregator(stream):
         return  # Handle case when stream is empty
 
 
+def img_payload_gen(ollama_params, usr_prompt, situations, batch_images=False):
+    for video in situations:
+        video_id = video["video_id"]
+        start = video.get("start", None)
+        end = video.get("end", None)
+        
+        print(f"\nVideo: {video_id}")
+        print(f" - interval: {start}-{end}")
+        print(f" - {len(video['frames'])} frames.")
+        
+        
+        payloads = []
+        frames = video.pop('frames')
+        if batch_images:
+            req_obj = {
+                # qid for backward compatibility
+                "qid": video_id,
+                **video,
+                "payload": {
+                    **ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": usr_prompt,
+                            "images": [f["encoding"] for f in frames],
+                        }
+                    ],
+                },
+            }
+            payloads = [req_obj]
+        else:
+            for frame in frames:
+                req_obj = {
+                    # qid for backward compatibility
+                    "qid": video_id,
+                    **video,
+                    "frame_id": frame["frame_id"],
+                    "payload": {
+                        **ollama_params,
+                        "messages": [
+                            {
+                            "role": "user",
+                                "content": usr_prompt,
+                                "images": [frame["encoding"]],
+                            }
+                        ],
+                    },
+                }
+
+                payloads.append(req_obj)
+        
+        for payload in payloads:
+            yield payload
+            
+
 def streaming_frame_generation(
     ollama_client,
-    video_dir,
+    frames_dir,
     output_file_path,
     usr_prompt,
     reply,
@@ -361,41 +418,14 @@ def streaming_frame_generation(
         max_samples: Maximum number of frames to sample per video
     """
 
-    def payload_gen(situations):
-        for video in situations:
-            video_id = video["video_id"]
-            start = video.get("start", None)
-            end = video.get("end", None)
-
-            print(f"\nVideo: {video_id}")
-            print(f" - interval: {start}-{end}")
-            print(f" - {len(video['frames'])} frames.")
-
-            for frame in video["frames"]:
-                req_obj = {
-                    # qid for backward compatibility
-                    "qid": video_id,
-                    "video_id": video_id,
-                    "start": start,
-                    "end": end,
-                    "frame_id": frame["frame_id"],
-                    "payload": {
-                        **ollama_client.ollama_params,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": usr_prompt,
-                                "images": [frame["encoding"]],
-                            }
-                        ],
-                    },
-                }
-
-                yield req_obj
-
     bp = batch_processor
     graph_gen_pipeline = bp.Pipeline(
-        payload_gen,
+        lambda situations: img_payload_gen(
+            situations=situations,
+            ollama_params=ollama_client.ollama_params,
+            usr_prompt=usr_prompt,
+            batch_images=False
+            ),
         lambda payload_gen: bp.stream_request(
             payload_gen, ollama_client, endpoint="chat"
         ),
@@ -418,7 +448,7 @@ def streaming_frame_generation(
     situations = (
         situation_frames
         for situation_frames in generate_frames(
-            video_dir, video_info, num_frames=max_samples
+            frames_dir, video_info, num_frames=max_samples
         )
     )
     graph_gen_pipeline.consume(situations)

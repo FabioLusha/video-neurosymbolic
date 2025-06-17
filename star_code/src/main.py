@@ -4,8 +4,10 @@ from os import system
 from pathlib import Path
 
 # relative imports work only with the 'from' form of the import
-from . import batch_processor, graph_gen
+from . import batch_processor, frames_tools
 from . import prompt_formatters as pf
+from .datasets import CVRRDataset, JudgeDataset, STARDataset
+from .ollama_manager import OllamaRequestManager
 from ._const import (
     BASE_DIR,
     DEFAULT_INPUT_FILE,
@@ -15,10 +17,6 @@ from ._const import (
     PROMPT_TYPES,
     TASK_TYPES,
 )
-from .datasets import CVRRDataset, JudgeDataset, STARDataset
-from .ollama_manager import OllamaRequestManager
-from .STAR_utils.visualization_tools import vis_utils
-
 
 def main():
     """Main entry point for the application."""
@@ -84,23 +82,24 @@ def main():
     parser.add_argument("--output-file", help="file path where to save the response")
 
     parser.add_argument(
-        "--video-dir",
+        "--frames-dir",
         type=str,
         required=True,
-        help="Directory containing the videos to process",
+        help="Directory with subfolders containing the extracted frames for each video",
     )
 
     parser.add_argument(
-        "--videos-metadata",
+        "--keyframes-info",
         type=str,
-        help="A JSON file containing the video-ids of the videos to be processed and metadata such as 'star' and 'end' specifying which part of the video to process",
+        required=True,
+        help="A CSV file with the mapping question_id - video_id - keyframes",
     )
 
     parser.add_argument(
         "--max-samples",
         type=int,
-        default=10,
-        help="Maximum number of frames to sample per video (default: 10)",
+        default=5,
+        help="Maximum number of frames to sample per video (default: 5)",
     )
 
     args = parser.parse_args()
@@ -229,40 +228,18 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
         reply = _load_prompt_fromfile(args.reply_file)
         if args.task == "vqa":
 
-            video_info = None
-            if args.videos_metadata:
-                videos_metadata_path = Path(args.videos_metadata)
 
-                if not videos_metadata_path.exists():
-                    raise FileNotFoundError(f"File not found: {videos_metadata_path}")
-
-                ext = videos_metadata_path.suffix.lower()
-
-                print(f"=== Loading file with videos metadata: {args.videos_metadata}")
-                with open(videos_metadata_path, "r", encoding="utf-8") as f:
-                    if ext == ".json":
-                        data = json.load(f)
-                        if isinstance(data, list):
-                            video_info = data
-                        else:
-                            video_info = [data]  # Wrap for consistency
-                    elif ext == ".jsonl":
-                        video_info = [
-                            json.loads(line.strip()) for line in f.readlines()
-                        ]
-                    else:
-                        raise ValueError(
-                            f"Unsupported file extension {ext}. "
-                            "Expected .json or .jsonl"
-                        )
-                    # remove duplicates and keeps only relevant metadata
-                    video_info = graph_gen.preprocess_videos_metadata(video_info)
-
-                    stream_vqa(
-                        ollama_client, prompts, video_info, reply, output_filepath
-                    )
-            else:
-                print("=== No video metadata file chosen")
+            if not args.keyframes_info:
+                raise ValueError("When using VQA task frames mode you need to provide file with keyframes data")
+            
+            print(f"=== Loading file with videos metadata: {args.keyframes_info}")
+            # remove duplicates and keeps only relevant metadata
+            video_keyframes_info = frames_tools.extract_video_keyframes_info(args.keyframes_info)
+            video_info = frames_tools.preprocess_videos_metadata(prompts, video_keyframes_info, filter=False)
+            print(f"=== Generating graphs for {len(video_info)} videos")
+            stream_vqa(
+                ollama_client, prompts, reply, args.frames_dir, video_info, args.max_sample, output_filepath
+            )
 
         else:
             reply = _load_prompt_fromfile(args.reply_file)
@@ -274,23 +251,24 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
         return
 
 
-def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
+def stream_vqa(
+    ollama_client, prompts, reply, frames_dir, video_info, max_sample, output_filepath
+    ):
 
     def payload_gen(situations):
-        prompts_dict = {p["qid"]: p["prompt"] for p in prompts}
+        prompts_dict = {p["question_id"]: p["prompt"] for p in prompts}
         for situation in situations:
-            frame_encodings = [frame["encoding"] for frame in situation]
+            question_id = situation['question_id']
+            frame_encodings = [frame["encoding"] for frame in situation['frames']]
 
             req_obj = {
-                "qid": situation[0][
-                    "question_id"
-                ],  # situation is list of [{question_id, frame_id, encoding}]
+                "qid": question_id,  # situation is list of [{question_id, frame_id, encoding}]
                 "payload": {
                     **ollama_client.ollama_params,
                     "messages": [
                         {
                             "role": "user",
-                            "content": prompts_dict[situation[0]["question_id"]],
+                            "content": prompts_dict[question_id],
                             "images": frame_encodings,
                         }
                     ],
@@ -313,8 +291,8 @@ def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
 
     situations = (
         situation_frames
-        for situation_frames in graph_gen.generate_frames(
-            ids=ids, iters=iters, max_sample=10
+        for situation_frames in frames_tools.generate_frames(
+            frames_dir, video_info, max_sample
         )
     )
     pipe.consume(situations)

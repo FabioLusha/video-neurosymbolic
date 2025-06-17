@@ -13,7 +13,7 @@ class PromptFormatter:
             args = dict()
             args = {field: sample[field] for field in self.fields}
             return args
-        raise NotImplementedError("You need to implement how to extract the fields from the sample.")
+        return {}
 
     def validate_fields(self, fields):
         pattern = r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}'
