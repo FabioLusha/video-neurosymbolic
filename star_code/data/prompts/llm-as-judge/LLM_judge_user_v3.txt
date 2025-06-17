@@ -26,4 +26,4 @@ Please evaluate the following question-answer pair:
 - Only provide the Python dictionary string.
 
 For example, your response should look like this:
-{'reason': 'The given answer "The capital of France is Paris." is semantically equivalent to the ground truth "Paris."', 'pred': 'correct', 'score': 5}
+{{'reason': 'The given answer "The capital of France is Paris." is semantically equivalent to the ground truth "Paris."', 'pred': 'correct', 'score': 5}}

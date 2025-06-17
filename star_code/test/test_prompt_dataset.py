@@ -1,15 +1,20 @@
 import json
-import os
-import sys
+import os, sys
+from pathlib import Path
+import subprocess
 import tempfile
+import time
 import unittest
-from collections import OrderedDict
 import pytest
 
-sys.path.append("../src")
+import requests
+
+# Add src directory to path FIRST (before other imports)
+src_path = str(Path(__file__).parent.parent / "src")
+sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
 
 import prompt_formatters as pf
-from ollama_manager import PromptDataset
+from datasets import PromptDataset
 
 
 class TestPromptDataset(unittest.TestCase):

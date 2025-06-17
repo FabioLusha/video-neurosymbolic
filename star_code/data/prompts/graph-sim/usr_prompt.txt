@@ -1,0 +1,310 @@
+You are tasked with comparing generated Spatio-Temporal Scene Graphs (STSGs) against ground truth representations to determine their correctness.
+
+CONSIDER A GENERATED STSG CORRECT IF:
+- All major entities from the ground truth are present (allowing for hyponyms/synonyms)
+- Spatial and temporal relationships are accurately represented
+- Minor descriptive additions don't contradict the ground truth
+
+CONSIDER A GENERATED STSG INCORRECT IF ANY OF THESE ERRORS OCCUR:
+- Missing Critical Entity: Major entities from ground truth are absent in frames where they should appear
+- Incorrect Spatial Relationships: Wrong predicates describing spatial connections (e.g., "on" vs "under", "left_of" vs "right_of")
+- Incorrect Temporal Relationships: Wrong predicates describing temporal sequences (e.g., "before" vs "after", "during" vs "outside")
+- Temporal Misalignment: Entities or relationships appearing in wrong time frames or durations
+- Contradictory Predicates: Relationships that directly contradict ground truth facts (e.g., "person sitting" when ground truth shows "person standing")
+
+- Semantic Inconsistency: Using terms that aren't semantically equivalent or valid hyponyms/hypernyms
+
+RESPONSE FORMAT:
+Assessment: [Your detailed analysis]
+Error Type: [If applicable]
+Final Answer: [CORRECT/INCORRECT]
+
+# EXAMPLE
+
+## GROUND-TRUTH:
+
+Frame 000106
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+Frame 000120
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+Frame 000137
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000167
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+Frame 000168
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- leaning_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+Frame 000176
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+Frame 000197
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+Frame 000200
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- holding --- blanket
+	person --- in_front_of --- blanket
+	person --- on_the_side_of --- blanket
+Frame 000228
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000276
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- on_the_side_of --- sofa/couch
+Frame 000279
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000280
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000285
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- on_the_side_of --- sofa/couch
+Frame 000335
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000359
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- beneath --- sofa/couch
+Frame 000390
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+Frame 000393
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- behind --- sofa/couch
+Frame 000394
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- sitting_on --- sofa/couch
+	person --- leaning_on --- sofa/couch
+	person --- beneath --- sofa/couch
+	person --- behind --- sofa/couch
+	person --- on_the_side_of --- sofa/couch
+Frame 000451
+	person --- holding --- clothes
+	person --- in_front_of --- clothes
+	person --- behind --- sandwich
+Frame 000471
+	person --- on_the_side_of --- clothes
+	person --- behind --- sandwich
+Frame 000501
+	person --- on_the_side_of --- clothes
+	person --- on_the_side_of --- sandwich
+	person --- touching --- dish
+	person --- in_front_of --- dish
+	person --- on_the_side_of --- dish
+Frame 000503
+	person --- holding --- sandwich
+	person --- in_front_of --- sandwich
+	person --- on_the_side_of --- dish
+Frame 000508
+	person --- on_the_side_of --- clothes
+	person --- on_the_side_of --- sandwich
+	person --- on_the_side_of --- dish
+Frame 000510
+	person --- on_the_side_of --- clothes
+	person --- behind --- sandwich
+	person --- on_the_side_of --- dish
+Frame 000517
+	person --- on_the_side_of --- clothes
+	person --- holding --- sandwich
+	person --- in_front_of --- sandwich
+	person --- touching --- dish
+	person --- on_the_side_of --- dish
+Frame 000539
+	person --- behind --- clothes
+	person --- holding --- sandwich
+	person --- in_front_of --- sandwich
+	person --- holding --- dish
+	person --- on_the_side_of --- dish
+	person --- in_front_of --- dish
+
+## GENERATED:
+
+Frame 0:
+
+
+woman ---- holding ---- white_plate
+white_plate ---- contains ---- food_on_plate
+woman ---- sitting_on ---- sofa
+sofa ---- has_cushions ---- sofa_cushions
+sofa_cushions ---- patterned ---- patterned_design
+sofa ---- in_front_of ---- wall
+wall ---- behind ---- sofa
+wall ---- has_curtains ---- curtains
+wall ---- has_picture_frame ---- picture_frame
+picture_frame ---- on_top_of ---- sofa
+light_fixture ---- above ---- woman
+light_fixture ---- attached_to ---- ceiling
+cabinet ---- to_right_of ---- woman
+cabinet ---- displays ---- decorative_items
+floor ---- below ---- woman
+floor ---- below ---- sofa
+
+Frame 1:
+
+woman ---- sitting_on ---- sofa
+sofa ---- has_cushion ---- cushion
+cushion ---- patterned_with ---- floral_pattern
+woman ---- holding ---- plate
+woman ---- holding ---- fork
+plate ---- in_front_of ---- woman
+fork ---- in_front_of ---- woman
+sofa ---- positioned_in_front_of ---- cabinet
+cabinet ---- located_behind ---- sofa
+cabinet ---- has_shelf ---- shelf
+shelf ---- displaying ---- picture_frame
+shelf ---- displaying ---- figurine
+shelf ---- displaying ---- decorative_object
+cabinet ---- attached_to ---- wall
+wall ---- has_light_fixture ---- light_fixture
+wall ---- positioned_behind ---- window
+
+Frame 2:
+
+woman ---- sitting_on ---- sofa
+cushions ---- on ---- sofa
+sheet ---- covering ---- sofa
+woman ---- holding ---- plate
+food_items ---- on ---- plate
+cabinet ---- behind ---- woman
+wall ---- behind ---- cabinet
+light_fixture ---- above ---- cabinet
+curtain ---- to_right_of ---- cabinet
+woman ---- looking_at ---- plate
+cushions ---- supporting ---- woman
+sheet ---- draped_over ---- sofa
+framed_pictures ---- displayed_on ---- cabinet
+decorative_items ---- arranged_on ---- cabinet
+woman ---- in_front_of ---- cabinet
+
+Frame 3:
+
+woman ---- wearing ---- apron
+apron ---- on ---- woman
+woman ---- standing_on ---- countertop
+sink ---- on ---- countertop
+faucet ---- attached_to ---- sink
+dishes ---- on ---- countertop
+paper_towel_roll ---- next_to ---- sink
+cabinet ---- behind ---- countertop
+cabinet_doors ---- on ---- cabinet
+wall ---- behind ---- cabinet
+light_fixture ---- above ---- sink
+window ---- behind ---- cabinet
+curtain ---- hanging_in ---- window
+woman ---- holding ---- bowl
+bowl ---- on ---- countertop
+
+Frame 4:
+
+
+couch ---- in_front_of ---- wall
+pillows ---- on ---- couch
+throw_blanket ---- draped_over ---- couch
+coffee_table ---- in_front_of ---- couch
+coffee_mugs ---- on ---- coffee_table
+plate ---- on ---- coffee_table
+spoon ---- on_top_of ---- plate
+remote_control ---- on ---- coffee_table
+wall ---- behind ---- couch
+curtains ---- hanging_on ---- wall
+television ---- mounted_on ---- wall
+shelves ---- built_into ---- wall
+decorative_items ---- on ---- shelves
+small_potted_plant ---- on ---- shelves
+picture_frames ---- on ---- shelves
+lamp ---- to_right_of ---- television
+outlet ---- on ---- wall
+throw_blanket ---- covering ---- couch
+coffee_mugs ---- near ---- plate
+remote_control ---- near ---- coffee_mugs
+television ---- providing_light_for ---- lamp
+
+
+Assesment:
+The generated Spatio-Temporal Scene Graph correctly represents the predicate (person, sitting_on, sofa), even though it refers to the person as 'woman'. This is considered correct because 'woman' is a hyponym (specialization) of 'person'.
+
+However, while the generated STSG is more descriptive than the ground truth, it fails to reference the entity 'clothes' in any frame, despite this entity appearing in the majority of frames in the ground-truth representation. Misiing a critical entity constitutes constitutes a major error; therefore, the generated STSG must be considered incorrect overall.
+
+Error type:
+Missing critical entity
+
+Final Answer: INCORRECT
+
+# END OF EXAMPLE
+
+Compare the following generated STSG against its ground truth representation:
+
+## GROUND-TRUTH
+
+{gt-stsg}
+
+## GENERATED
+
+{gen-stsg}

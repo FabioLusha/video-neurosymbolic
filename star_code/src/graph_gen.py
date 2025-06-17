@@ -9,8 +9,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-import batch_processor
-from ollama_manager import OllamaRequestManager
+from . import batch_processor
+from .ollama_manager import OllamaRequestManager
 
 SEED = 13471225022025
 
@@ -127,7 +127,7 @@ def main():
                     video_info = data
                 else:
                     video_info = [data] # Wrap for consistency
-            elif ext == '.josnl':
+            elif ext == '.jsonl':
                 video_info = [json.loads(line.strip()) for line in f.readlines()]
             else:
                 raise ValueError(
@@ -136,6 +136,7 @@ def main():
                 )
             # remove duplicates and keeps only relevant metadata
             video_info = preprocess_videos_metadata(video_info)
+            print(f"=== Generating graphs for {len(video_info)} videos")
     else:
         print("=== No video metadata file chosen")
     
@@ -186,6 +187,7 @@ def preprocess_videos_metadata(dataset):
             continue
 
 
+        seen.add((video_id, start, end))
         video_info.append({
             'video_id': video_id,
             'start': start,

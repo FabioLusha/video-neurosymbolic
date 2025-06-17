@@ -1,0 +1,30 @@
+digraph G {
+	nodesep=0.5 overlap=false rankdir=LR ranksep=1.0 splines=line
+	l_person [label=person color=lightblue shape=ellipse]
+	r_bag [label=bag color=lightblue shape=ellipse]
+	r_door [label=door color=lightblue shape=ellipse]
+	m_holding_bag [label=holding color=pink shape=box]
+	m_on_the_side_of_bag [label=on_the_side_of color=pink shape=box]
+	m_behind_door [label=behind color=pink shape=box]
+	m_on_the_side_of_bag -> r_bag
+	l_person -> m_holding_bag
+	l_person -> m_behind_door
+	m_holding_bag -> r_bag
+	m_behind_door -> r_door
+	l_person -> m_on_the_side_of_bag
+	{
+		rank=same
+		l_person
+	}
+	{
+		rank=same
+		m_holding_bag
+		m_on_the_side_of_bag
+		m_behind_door
+	}
+	{
+		rank=same
+		r_bag
+		r_door
+	}
+}

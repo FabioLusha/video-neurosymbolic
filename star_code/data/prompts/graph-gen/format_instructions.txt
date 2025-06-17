@@ -1,0 +1,17 @@
+Now organize the objects and relationships you identified into a formal scene graph using this format:
+object1 ---- relationship ---- object2
+
+The list of relationship predicates should be introduced by the tag <scene_graph> and terminated by the tag </scene_graph>
+For example:
+woman ---- sitting_on ---- chair
+dog ---- lying_under ---- table
+book ---- on_top_of ---- shelf
+
+Please follow these guidelines:
+1. Create at least 10 relationship triplets (more if the image is complex)
+2. Use specific and consistent object labels
+3. Use concise but descriptive relationship terms (connect words with underscores)
+4. Include all meaningful relationships between objects
+5. Verify that all objects you identified in step 1 appear in at least one relationship
+
+Your scene graph:
