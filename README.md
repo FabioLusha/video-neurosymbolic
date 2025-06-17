@@ -180,6 +180,19 @@ python -m star_code.src.main \
 ```
 
 #### CVRR Dataset
+
+**GRAPH GENERATION**
+```bash
+python -m star_code.src.graph_gen \
+  --model gemma3:4b-it-qat \
+  --model-options star_code/ollama_model_options.json \
+  --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
+  --videos-metadata star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
+  --output-file outputs/generated_stsg.jsonl \
+  --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
+  --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
+  --max-samples 30
+```
 The CVRR dataset contains only open-ended questions, so it should be used with the `open_qa` prompt type. Here's an example:
 
 ```bash

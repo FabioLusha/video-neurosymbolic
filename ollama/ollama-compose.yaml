@@ -4,7 +4,7 @@ networks:
 
 services:
   ollama_service:
-    image: ollama/ollama
+    image: ollama/ollama:0.9.1
     environment:
       - OLLAMA_HOST=0.0.0.0:11435
       - OLLAMA_LOG=debug

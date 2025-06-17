@@ -8,6 +8,7 @@ services:
     container_name: ${USER}_pydev_env
     env_file:
       - .env
+      - private.env
     user: "${USER}:${USER}"
     stdin_open: true  # same as -i
     tty: true         # same as -t
