@@ -4,10 +4,17 @@ from os import system
 from pathlib import Path
 
 # relative imports work only with the 'from' form of the import
-from . import batch_processor
+from . import batch_processor, graph_gen
 from . import prompt_formatters as pf
-from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
-                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
+from ._const import (
+    BASE_DIR,
+    DEFAULT_INPUT_FILE,
+    DEFAULT_MODEL_OPTIONS,
+    DEFAULT_PROMPTS,
+    OLLAMA_URL,
+    PROMPT_TYPES,
+    TASK_TYPES,
+)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
 from .STAR_utils.visualization_tools import vis_utils
@@ -76,6 +83,26 @@ def main():
     )
     parser.add_argument("--output-file", help="file path where to save the response")
 
+    parser.add_argument(
+        "--video-dir",
+        type=str,
+        required=True,
+        help="Directory containing the videos to process",
+    )
+
+    parser.add_argument(
+        "--videos-metadata",
+        type=str,
+        help="A JSON file containing the video-ids of the videos to be processed and metadata such as 'star' and 'end' specifying which part of the video to process",
+    )
+
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=10,
+        help="Maximum number of frames to sample per video (default: 10)",
+    )
+
     args = parser.parse_args()
 
     # Step 2: Load prompts
@@ -92,7 +119,6 @@ def main():
     if args.user_prompt != "default":
         user_prompt_path = args.user_prompt
     user_prompt = _load_prompt_fromfile(user_prompt_path)
-
 
     # Step 3: Create prompt formatter
     prompt_formatter = create_prompt_formatter(args, user_prompt)
@@ -181,7 +207,7 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
 
     if args.task == "llm-judge":
         print("=== Loading judge type dataset")
-        dataset = JudgeDataset(dataset, args.responses_file , prompt_formatter)
+        dataset = JudgeDataset(dataset, args.responses_file, prompt_formatter)
 
     return dataset
 
@@ -200,9 +226,44 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
                 "Chat mode requires a reply prompt file. Please provide one using the --reply-file parameter."
             )
 
+        reply = _load_prompt_fromfile(args.reply_file)
         if args.task == "vqa":
-            print("This feature is not implemented yet!!!")
-            return
+
+            video_info = None
+            if args.videos_metadata:
+                videos_metadata_path = Path(args.videos_metadata)
+
+                if not videos_metadata_path.exists():
+                    raise FileNotFoundError(f"File not found: {videos_metadata_path}")
+
+                ext = videos_metadata_path.suffix.lower()
+
+                print(f"=== Loading file with videos metadata: {args.videos_metadata}")
+                with open(videos_metadata_path, "r", encoding="utf-8") as f:
+                    if ext == ".json":
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            video_info = data
+                        else:
+                            video_info = [data]  # Wrap for consistency
+                    elif ext == ".jsonl":
+                        video_info = [
+                            json.loads(line.strip()) for line in f.readlines()
+                        ]
+                    else:
+                        raise ValueError(
+                            f"Unsupported file extension {ext}. "
+                            "Expected .json or .jsonl"
+                        )
+                    # remove duplicates and keeps only relevant metadata
+                    video_info = graph_gen.preprocess_videos_metadata(video_info)
+
+                    stream_vqa(
+                        ollama_client, prompts, video_info, reply, output_filepath
+                    )
+            else:
+                print("=== No video metadata file chosen")
+
         else:
             reply = _load_prompt_fromfile(args.reply_file)
             batch_processor.batch_automatic_chat_reply(
@@ -211,6 +272,53 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
     else:
         print("Error: You must select one of the available modes: 'generate' or 'chat'")
         return
+
+
+def stream_vqa(ollama_client, prompts, ids, reply, output_filepath, iters=-1):
+
+    def payload_gen(situations):
+        prompts_dict = {p["qid"]: p["prompt"] for p in prompts}
+        for situation in situations:
+            frame_encodings = [frame["encoding"] for frame in situation]
+
+            req_obj = {
+                "qid": situation[0][
+                    "question_id"
+                ],  # situation is list of [{question_id, frame_id, encoding}]
+                "payload": {
+                    **ollama_client.ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompts_dict[situation[0]["question_id"]],
+                            "images": frame_encodings,
+                        }
+                    ],
+                },
+            }
+
+            yield req_obj
+
+    bp = batch_processor
+    pipe = bp.Pipeline(
+        # the first generator converts the prompt to the right format
+        payload_gen,
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
+        lambda stream: (o for o in stream if o["status"] == "ok"),
+        lambda resp_gen: bp.auto_reply_gen(resp_gen, reply),
+        lambda resp_gen: bp.stream_save(
+            resp_gen, bp.ChatResponseFormatter(), output_filepath
+        ),
+    )
+
+    situations = (
+        situation_frames
+        for situation_frames in graph_gen.generate_frames(
+            ids=ids, iters=iters, max_sample=10
+        )
+    )
+    pipe.consume(situations)
+    return
 
 
 if __name__ == "__main__":
