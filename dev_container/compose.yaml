@@ -25,6 +25,7 @@ services:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
-              device_ids: ["3"]
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ['1']
     cpuset: "0-7"

@@ -35,8 +35,8 @@ DEFAULT_PROMPTS = {
         BASE_DIR / "data/prompts/llm-as-judge/LLM_judge_user_v2.txt",
     ),
     "vqa": (
-        BASE_DIR / "data/prompts/img_answer/system_prompt.txt",
-        BASE_DIR / "data/prompts/img_answer/user_prompt.txt",
+        None,
+        BASE_DIR / "data/prompts/vqa/user_prompt.txt",
     ),
 }
 

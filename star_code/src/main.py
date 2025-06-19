@@ -65,7 +65,8 @@ def main():
         help="File with the spatio-temporal scene graphs if these are not included in the main dataset",
     )
     parser.add_argument(
-        "--responses-file", help="File with the responses to be evaluated by the judge"
+        "--responses-file",
+        help="File with the responses to be evaluated by the judge"
     )
     parser.add_argument(
         "--mode",
@@ -77,19 +78,20 @@ def main():
         "--reply-file",
         help="File with the text for the automatic reply when run in chat mode",
     )
-    parser.add_argument("--output-file", help="file path where to save the response")
+    parser.add_argument(
+        "--output-file",
+        help="file path where to save the response"
+    )
 
     parser.add_argument(
         "--frames-dir",
         type=str,
-        required=True,
         help="Directory with subfolders containing the extracted frames for each video",
     )
 
     parser.add_argument(
         "--keyframes-info",
         type=str,
-        required=True,
         help="A CSV file with the mapping question_id - video_id - keyframes",
     )
 
@@ -110,6 +112,8 @@ def main():
     if args.sys_prompt:
         if args.sys_prompt != "default":
             system_prompt_path = args.sys_prompt
+        elif args.sys_prompt == 'default' and system_prompt_path is None:
+            raise ValueError(f"There no default system prompt for the {args.prompt_type}")
         system_prompt = _load_prompt_fromfile(system_prompt_path)
 
     # --user-prompt is a required argument
@@ -248,11 +252,6 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                     dataset, video_keyframes_info, filter=False
                 )
 
-                for sample in dataset:
-                    sample["video_id"] = sample["question_id"]
-
-                for video_info in videos_info:
-                    video_info["video_id"] = video_info["question_id"]
 
                 stream_vqa(
                     ollama_client,
@@ -260,7 +259,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                     reply,
                     args.frames_dir,
                     videos_info,
-                    args.max_sample,
+                    args.max_samples,
                     output_filepath,
                 )
 
@@ -282,14 +281,13 @@ def stream_vqa(
 ):
 
     def _payload_gen(dataset, videos_info):
-        videos_info = {v["video_id"]: v for v in videos_info}
+        videos_info = {v["question_id"]: v for v in videos_info}
 
         for datum in dataset:
             question_id = datum["question_id"]
-            video_id = datum["video_id"]
 
             keyframes = frames_tools.generate_frames(
-                frames_dir, videos_info[video_id], max_sample
+                frames_dir, videos_info[question_id], max_sample
             )
 
             if not keyframes:
@@ -305,7 +303,7 @@ def stream_vqa(
                     "messages": [
                         {
                             "role": "user",
-                            "content": datum[question_id]["prompt"],
+                            "content": datum["prompt"],
                             "images": encodings,
                         }
                     ],
