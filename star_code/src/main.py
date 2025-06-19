@@ -3,8 +3,15 @@ import json
 
 # relative imports work only with the 'from' form of the import
 from . import batch_processor, frames_tools
-from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
-                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
+from ._const import (
+    BASE_DIR,
+    DEFAULT_INPUT_FILE,
+    DEFAULT_MODEL_OPTIONS,
+    DEFAULT_PROMPTS,
+    OLLAMA_URL,
+    PROMPT_TYPES,
+    TASK_TYPES,
+)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
 
@@ -227,19 +234,25 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
             if args.dataset_type == "star":
 
                 if not args.keyframes_info:
-                    raise ValueError("When using VQA task frames mode you need to provide file with keyframes data")
+                    raise ValueError(
+                        "When using VQA task frames mode you need to provide file with keyframes data"
+                    )
 
                 print(f"=== Loading file with videos metadata: {args.keyframes_info}")
                 # remove duplicates and keeps only relevant metadata
 
-                video_keyframes_info = frames_tools.extract_video_keyframes_info(args.keyframes_info)
-                videos_info = frames_tools.preprocess_videos_metadata(dataset, video_keyframes_info, filter=False)
+                video_keyframes_info = frames_tools.extract_video_keyframes_info(
+                    args.keyframes_info
+                )
+                videos_info = frames_tools.preprocess_videos_metadata(
+                    dataset, video_keyframes_info, filter=False
+                )
 
                 for sample in dataset:
-                    sample['video_id'] = sample['question_id']
+                    sample["video_id"] = sample["question_id"]
 
                 for video_info in videos_info:
-                    video_info['video_id'] = video_info['question_id']
+                    video_info["video_id"] = video_info["question_id"]
 
                 stream_vqa(
                     ollama_client,
@@ -248,7 +261,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                     args.frames_dir,
                     videos_info,
                     args.max_sample,
-                    output_filepath
+                    output_filepath,
                 )
 
             else:
@@ -265,20 +278,25 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
 
 
 def stream_vqa(
-    ollama_client,
-    prompts,
-    reply,
-    frames_dir,
-    video_info,
-    max_sample,
-    output_filepath
-    ):
+    ollama_client, dataset, reply, frames_dir, videos_info, max_sample, output_filepath
+):
 
-    def payload_gen(situations):
-        prompts_dict = {p["question_id"]: p["prompt"] for p in prompts}
-        for situation in situations:
-            question_id = situation['question_id']
-            frame_encodings = [frame["encoding"] for frame in situation['frames']]
+    def _payload_gen(dataset, videos_info):
+        videos_info = {v["video_id"]: v for v in videos_info}
+
+        for datum in dataset:
+            question_id = datum["question_id"]
+            video_id = datum["video_id"]
+
+            keyframes = frames_tools.generate_frames(
+                frames_dir, videos_info[video_id], max_sample
+            )
+
+            if not keyframes:
+                print(
+                    f"Warning! Couldn't extract frames for question <{question_id}>. Skipping..."
+                )
+            encodings = [frame["encoding"] for frame in keyframes]
 
             req_obj = {
                 "qid": question_id,  # situation is list of [{question_id, frame_id, encoding}]
@@ -287,8 +305,8 @@ def stream_vqa(
                     "messages": [
                         {
                             "role": "user",
-                            "content": prompts_dict[question_id],
-                            "images": frame_encodings,
+                            "content": datum[question_id]["prompt"],
+                            "images": encodings,
                         }
                     ],
                 },
@@ -299,22 +317,16 @@ def stream_vqa(
     bp = batch_processor
     pipeline = bp.Pipeline(
         # the first generator converts the prompt to the right format
-        payload_gen,
+        lambda dataset_gen: _payload_gen(dataset_gen, videos_info),
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
-        lambda stream: (o for o in stream if o["status"] == "ok"),
-        lambda resp_gen: bp.auto_reply_gen(resp_gen, reply),
-        lambda resp_gen: bp.stream_save(
-            resp_gen, bp.ChatResponseFormatter(), output_filepath
+        lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
+        lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),
+        lambda resp_stream: bp.stream_save(
+            resp_stream, bp.ChatResponseFormatter(), output_filepath
         ),
     )
 
-    situations = (
-        situation_frames
-        for situation_frames in frames_tools.generate_frames(
-            frames_dir, video_info, max_sample
-        )
-    )
-    pipeline.consume(situations)
+    pipeline.consume(dataset)
     return
 
 
