@@ -210,7 +210,25 @@ python -m star_code.src.main \
   --stsg-file star_code/data/datasets/CVRR/generated_stsg_cvrr.json \
   --output-file cvrr_qa_responses.jsonl
 ```
+### Pure VQA - using extracted frames
 
+```bash
+python -m star_code.src.main \
+    --task vqa \
+    --frames-dir star_code/data/datasets/action-genome/frames \
+    --keyframes-info star_code/data/datasets/STAR/Video_Keyframe_IDs.csv \
+    --max-samples 5 \
+    --model gemma3:4b-it-qat \
+    --model-options star_code/ollama_model_options.json \
+    --prompt-type vqa \
+    --mode chat \
+    --sys-prompt "" \
+    --user-prompt star_code/data/prompts/vqa/user_prompt_v2.txt \
+    --reply-file star_code/data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt \
+    --dataset-type star \
+    --input-file star_code/data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json \
+    --output-file star_code/outputs/vqa_gemma3:4b-it-qat_20250619_20:59:00.jsonl
+```
 ## Some useful commands for ollama
 
 Here are some useful commands for managing Ollama in the containerized environment:
