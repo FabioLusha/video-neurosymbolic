@@ -242,50 +242,39 @@ def sample_frames(key_frames, max_sample):
     return frame_ids
 
 
-def generate_frames(frames_dir, video_info=None, num_frames=5):
+def generate_frames(frames_dir, video_info, num_frames=5):
     frames_dir = Path(frames_dir)
 
-    if video_info is None:
-        video_files = list(frames_dir.glob("*.mp4"))
-        video_info = [
-            {"video_id": v.stem, "keyframes": [f.stem for f in list(v.glob("*.png"))]}
-            for v in video_files
-        ]
-    else:
-        video_info = video_info.copy()
-        
-    for video_metadata in video_info:
-        video_id = video_metadata["video_id"]
-        keyframes = sample_frames(video_metadata.pop("keyframes"), num_frames)
+    video_id = video_info["video_id"]
+    keyframes = sample_frames(video_info["keyframes"], num_frames)
 
-        b64_encodings = []
-        for i, keyframe in enumerate(keyframes):
-            frame_path = frames_dir / f"{video_id}.mp4/{keyframe}.png"
+    b64_encodings = []
+    for keyframe in keyframes:
+        frame_path = frames_dir / f"{video_id}.mp4/{keyframe}.png"
 
-            if not frame_path.exists():
-                print(
-                    f"Warning: Frame {frame_path} was not extracted successfully, skipping"
+        if not frame_path.exists():
+            print(
+                f"Warning: Frame {frame_path} was not extracted successfully, skipping"
+            )
+            continue
+
+        try:
+            with open(frame_path, "rb") as f:
+                img_bytes = f.read()
+                b64_encodings.append(
+                    {
+                        "frame_id": keyframe,
+                        "encoding": base64.b64encode(img_bytes).decode("utf-8"),
+                    }
                 )
-                continue
+        except Exception as e:
+            print(f"Error reading frame {keyframe}: {str(e)}")
+            continue
 
-            try:
-                with open(frame_path, "rb") as f:
-                    img_bytes = f.read()
-                    b64_encodings.append(
-                        {
-                            "frame_id": keyframe,
-                            "encoding": base64.b64encode(img_bytes).decode("utf-8"),
-                        }
-                    )
-            except Exception as e:
-                print(f"Error reading frame {i}: {str(e)}")
-                continue
+    if not b64_encodings:
+        print(f"Warning: No valid frames were extracted for video {video_id}")
 
-        # Only yield if we have at least one valid frame
-        if b64_encodings:
-            yield {**video_metadata, "frames": b64_encodings}
-        else:
-            print(f"Warning: No valid frames were extracted for video {video_id}")
+    return b64_encodings
 
 
 def extract_frame_description(text):
@@ -295,12 +284,12 @@ def extract_frame_description(text):
     Args:
         text: Response text from the model
 
-    Returns:
+    Returns
         Extracted scene graph description or empty string
     """
     if not text:
         return ""
-        
+
     # the ?s: in the middle capturing group sets the flag re.DOTALL
     pattern = "(?<=<scene_graph>)(?s:.+)(?=</scene_graph>)"
     match = re.search(pattern, text)
@@ -343,8 +332,8 @@ def frame_aggregator(stream):
         return  # Handle case when stream is empty
 
 
-def img_payload_gen(ollama_params, usr_prompt, situations, batch_images=False):
-    for video in situations:
+def img_payload_gen(ollama_params, usr_prompt, frames_dir, videos_info, max_sample, batch_images=False):
+    for video in videos_info:
         video_id = video["video_id"]
         start = video.get("start", None)
         end = video.get("end", None)
@@ -355,7 +344,11 @@ def img_payload_gen(ollama_params, usr_prompt, situations, batch_images=False):
         
         
         payloads = []
-        frames = video.pop('frames')
+
+        frames = generate_frames(frames_dir, video, max_sample)
+        if not frames:
+            print(f"Warning: Couldn't extract frames from video {video_id}. Skipping")
+
         if batch_images:
             req_obj = {
                 # qid for backward compatibility

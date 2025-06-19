@@ -13,7 +13,7 @@ def sample_frames(frame_ids, max_show_num):
     if max_show_num == 0:
         return frame_ids
     max_show_num = min(len(frame_ids), max_show_num)
-    interval = ceil(len(frame_ids) / max_show_num)
+    interval = int(len(frame_ids) / max_show_num)
     return frame_ids[::interval]
 
 def trim_keyframes(data, fps, max_show_num=4):

@@ -1,22 +1,13 @@
 import argparse
 import json
-from os import system
-from pathlib import Path
 
 # relative imports work only with the 'from' form of the import
 from . import batch_processor, frames_tools
-from . import prompt_formatters as pf
+from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
+                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
-from ._const import (
-    BASE_DIR,
-    DEFAULT_INPUT_FILE,
-    DEFAULT_MODEL_OPTIONS,
-    DEFAULT_PROMPTS,
-    OLLAMA_URL,
-    PROMPT_TYPES,
-    TASK_TYPES,
-)
+
 
 def main():
     """Main entry point for the application."""
@@ -126,7 +117,9 @@ def main():
     dataset = initialize_dataset(
         args, args.input_file or DEFAULT_INPUT_FILE, prompt_formatter, args.ids_file
     )
-    prompts = [dataset[i] for i in range(len(dataset))]
+
+    # iterating over the dataset formats the prompts
+    dataset = [dataset[i] for i in range(len(dataset))]
 
     # Step 5: Load model options and initialize Ollama manager
     model_options = _load_model_options(args.model_options)
@@ -142,7 +135,11 @@ def main():
 
     # Step 6: Load model and process prompts
     ollama_client.load_model()
-    process_prompts(ollama_client, prompts, args.mode, args, args.output_file)
+    if args.task == "graph-understanding" or args.task == "vqa":
+        # TODO:
+        # For Now VQA is set only for chat mode and is inside the condition of what
+        # to apply is incide process_promtps
+        process_prompts(ollama_client, dataset, args.mode, args, args.output_file)
 
 
 def create_prompt_formatter(args, user_prompt):
@@ -211,12 +208,12 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
     return dataset
 
 
-def process_prompts(ollama_client, prompts, mode, args, output_filepath):
+def process_prompts(ollama_client, dataset, mode, args, output_filepath):
     """Process prompts based on the selected mode."""
     if mode == "generate":
         print("=== Mode: generate")
         batch_processor.batch_generate(
-            ollama_client, prompts, output_file_path=output_filepath
+            ollama_client, dataset, output_file_path=output_filepath
         )
     elif mode == "chat":
         print("=== Mode: chat")
@@ -227,24 +224,40 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
 
         reply = _load_prompt_fromfile(args.reply_file)
         if args.task == "vqa":
+            if args.dataset_type == "star":
 
+                if not args.keyframes_info:
+                    raise ValueError("When using VQA task frames mode you need to provide file with keyframes data")
 
-            if not args.keyframes_info:
-                raise ValueError("When using VQA task frames mode you need to provide file with keyframes data")
-            
-            print(f"=== Loading file with videos metadata: {args.keyframes_info}")
-            # remove duplicates and keeps only relevant metadata
-            video_keyframes_info = frames_tools.extract_video_keyframes_info(args.keyframes_info)
-            video_info = frames_tools.preprocess_videos_metadata(prompts, video_keyframes_info, filter=False)
-            print(f"=== Generating graphs for {len(video_info)} videos")
-            stream_vqa(
-                ollama_client, prompts, reply, args.frames_dir, video_info, args.max_sample, output_filepath
-            )
+                print(f"=== Loading file with videos metadata: {args.keyframes_info}")
+                # remove duplicates and keeps only relevant metadata
+
+                video_keyframes_info = frames_tools.extract_video_keyframes_info(args.keyframes_info)
+                videos_info = frames_tools.preprocess_videos_metadata(dataset, video_keyframes_info, filter=False)
+
+                for sample in dataset:
+                    sample['video_id'] = sample['question_id']
+
+                for video_info in videos_info:
+                    video_info['video_id'] = video_info['question_id']
+
+                stream_vqa(
+                    ollama_client,
+                    dataset,
+                    reply,
+                    args.frames_dir,
+                    videos_info,
+                    args.max_sample,
+                    output_filepath
+                )
+
+            else:
+                raise NotImplementedError("The VQA works for only the star dataset")
 
         else:
             reply = _load_prompt_fromfile(args.reply_file)
             batch_processor.batch_automatic_chat_reply(
-                ollama_client, prompts, reply, output_file_path=output_filepath
+                ollama_client, dataset, reply, output_file_path=output_filepath
             )
     else:
         print("Error: You must select one of the available modes: 'generate' or 'chat'")
@@ -252,7 +265,13 @@ def process_prompts(ollama_client, prompts, mode, args, output_filepath):
 
 
 def stream_vqa(
-    ollama_client, prompts, reply, frames_dir, video_info, max_sample, output_filepath
+    ollama_client,
+    prompts,
+    reply,
+    frames_dir,
+    video_info,
+    max_sample,
+    output_filepath
     ):
 
     def payload_gen(situations):
@@ -278,7 +297,7 @@ def stream_vqa(
             yield req_obj
 
     bp = batch_processor
-    pipe = bp.Pipeline(
+    pipeline = bp.Pipeline(
         # the first generator converts the prompt to the right format
         payload_gen,
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
@@ -295,7 +314,7 @@ def stream_vqa(
             frames_dir, video_info, max_sample
         )
     )
-    pipe.consume(situations)
+    pipeline.consume(situations)
     return
 
 
