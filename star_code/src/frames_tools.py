@@ -118,33 +118,35 @@ def main():
 
     # Process IDs if provided
     video_info = None
-    if args.question_dataset:
-        question_dataset_path = Path(args.question_dataset)
+    if not args.question_dataset:
+        raise NotImplementedError("Handling video frames without the corresponding question_id dataset has not been implemented yet!")
 
-        if not question_dataset_path.exists():
-            raise FileNotFoundError(f"File not found: {question_dataset_path}")
+    question_dataset_path = Path(args.question_dataset)
 
-        ext = question_dataset_path.suffix.lower()
+    if not question_dataset_path.exists():
+        raise FileNotFoundError(f"File not found: {question_dataset_path}")
 
-        print(f"=== Loading file with videos metadata: {args.question_dataset}")
-        with open(question_dataset_path, "r", encoding="utf-8") as f:
-            if ext == ".json":
-                data = json.load(f)
-                if isinstance(data, list):
-                    video_info = data
-                else:
-                    video_info = [data]  # Wrap for consistency
-            elif ext == ".jsonl":
-                video_info = [json.loads(line.strip()) for line in f.readlines()]
+    ext = question_dataset_path.suffix.lower()
+
+    print(f"=== Loading file with videos metadata: {args.question_dataset}")
+    with open(question_dataset_path, "r", encoding="utf-8") as f:
+        if ext == ".json":
+            data = json.load(f)
+            if isinstance(data, list):
+                video_info = data
             else:
-                raise ValueError(
-                    f"Unsupported file extension {ext}. " "Expected .json or .jsonl"
-                )
+                video_info = [data]  # Wrap for consistency
+        elif ext == ".jsonl":
+            video_info = [json.loads(line.strip()) for line in f.readlines()]
+        else:
+            raise ValueError(
+                f"Unsupported file extension {ext}. " "Expected .json or .jsonl"
+            )
 
-            # remove duplicates and keeps only relevant metadata
-            video_keyframes_info = extract_video_keyframes_info(args.keyframes_info)
-            video_info = preprocess_videos_metadata(video_info, video_keyframes_info, filter=False)
-            print(f"=== Generating graphs for {len(video_info)} videos")
+        # remove duplicates and keeps only relevant metadata
+        video_keyframes_info = extract_video_keyframes_info(args.keyframes_info)
+        video_info = preprocess_videos_metadata(video_info, video_keyframes_info, filter=False)
+        print(f"=== Generating graphs for {len(video_info)} videos")
 
     url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
@@ -174,7 +176,7 @@ def main():
         client,
         args.frames_dir,
         args.output_file,
-        video_info=video_info,
+        videos_info=video_info,
         usr_prompt=usr_prompt,
         reply=reply,
         max_samples=args.max_samples,
@@ -215,10 +217,10 @@ def preprocess_videos_metadata(dataset, video_keyframes_info, filter=False):
         qid = data_point["question_id"]
         keyframes = sorted(video_keyframes_info[qid]["keyframes"])
 
-        if filter and (video_id, ".".join(keyframes)) in seen:
+        if filter and (video_id, "_".join(keyframes)) in seen:
             continue
 
-        seen.add((video_id, ".".join(keyframes)))
+        seen.add((video_id, "_".join(keyframes)))
         video_info.append({"question_id": qid, "video_id": video_id, "keyframes": keyframes})
 
     return video_info
@@ -332,20 +334,27 @@ def frame_aggregator(stream):
         return  # Handle case when stream is empty
 
 
-def img_payload_gen(ollama_params, usr_prompt, frames_dir, videos_info, max_sample, batch_images=False):
+def img_payload_gen(
+    ollama_params,
+    usr_prompt,
+    frames_dir,
+    videos_info,
+    max_sample,
+    batch_images=False
+):
+
     for video in videos_info:
         video_id = video["video_id"]
         start = video.get("start", None)
         end = video.get("end", None)
-        
-        print(f"\nVideo: {video_id}")
-        print(f" - interval: {start}-{end}")
-        print(f" - {len(video['frames'])} frames.")
-        
-        
-        payloads = []
 
         frames = generate_frames(frames_dir, video, max_sample)
+        print(f"\nVideo: {video_id}")
+        print(f" - interval: {start}-{end}")
+        print(f" - {len(frames)} frames.")
+
+
+        payloads = []
         if not frames:
             print(f"Warning: Couldn't extract frames from video {video_id}. Skipping")
 
@@ -386,10 +395,9 @@ def img_payload_gen(ollama_params, usr_prompt, frames_dir, videos_info, max_samp
                 }
 
                 payloads.append(req_obj)
-        
+
         for payload in payloads:
             yield payload
-            
 
 def streaming_frame_generation(
     ollama_client,
@@ -397,8 +405,8 @@ def streaming_frame_generation(
     output_file_path,
     usr_prompt,
     reply,
-    video_info=None,
-    max_samples=10,
+    videos_info,
+    max_samples=5,
 ):
     """
     Generate scene graph descriptions for video frames.
@@ -413,10 +421,12 @@ def streaming_frame_generation(
 
     bp = batch_processor
     graph_gen_pipeline = bp.Pipeline(
-        lambda situations: img_payload_gen(
-            situations=situations,
-            ollama_params=ollama_client.ollama_params,
-            usr_prompt=usr_prompt,
+        lambda videos_info: img_payload_gen(
+            ollama_client.ollama_params,
+            usr_prompt,
+            frames_dir,
+            videos_info,
+            max_samples,
             batch_images=False
             ),
         lambda payload_gen: bp.stream_request(
@@ -438,13 +448,8 @@ def streaming_frame_generation(
         ),
     )
 
-    situations = (
-        situation_frames
-        for situation_frames in generate_frames(
-            frames_dir, video_info, num_frames=max_samples
-        )
-    )
-    graph_gen_pipeline.consume(situations)
+    videos = (video for video in videos_info)
+    graph_gen_pipeline.consume(videos)
     return
 
 
