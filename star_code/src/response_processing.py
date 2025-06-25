@@ -122,7 +122,8 @@ def gemma3_ans_extract(input_filepath):
     # \n```
     # ```
 
-    json_mask = predictions_df["answer"].str.match(r"^(```json\s)?({[^}]+})(\s```)?$")
+    json_pattern = r"^(?:```json\s)?({[^}]+})(?:\s```)?"
+    json_mask = predictions_df["answer"].str.match(json_pattern)
     matches_json_template = json_mask.sum()
 
     print(f"Total answers: {len(predictions_df)}")
@@ -133,7 +134,7 @@ def gemma3_ans_extract(input_filepath):
 
     predictions_df.loc[json_mask, "answer"] = predictions_df.loc[
         json_mask, "answer"
-    ].apply(lambda x: re.search(r"^(?:```json\s)?({[^}]+})(?:\s```)?$", x).group(1))
+    ].apply(lambda x: re.search(json_pattern, x).group(1))
 
     predictions_df.loc[~json_mask, "answer"] = ""
 
