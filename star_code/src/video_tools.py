@@ -1,11 +1,11 @@
 import base64
 import json
+import logging
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-import logging
 
 logging.basicConfig(
     filename='video_tools.log',
@@ -42,8 +42,8 @@ def extract_frames(
     video_path,
     fps=1,
     max_frames=None,
-    start_time=0.0,
-    end_time=0.0,
+    start_time=None,
+    end_time=None,
     output_dir=None,
 ):
     """Extract num_frames uniformly sampled frames from the video within specified time range.
@@ -71,26 +71,24 @@ def extract_frames(
     ]
 
     # set start time
+    start_time = start_time or 0.0
     if start_time and start_time > 0:
         cmd += ["-ss", str(start_time)]
 
     cmd += ["-i", video_path]
-    # Set end_time if not provided
-    # not 0.0 := True
-    if not end_time or end_time > duration:
-        end_time = duration
+    # Limit duration if end_time is set
+    if end_time:
+        if end_time > duration:
+            end_time = duration
+        cmd += ["-t", str(end_time - start_time)]
 
-    if start_time > end_time or (end_time - start_time) < 0.1:
+    if start_time > duration or (end_time and start_time > end_time): 
         raise ValueError(
-            "The provided 'start_time' is exceeds the end_time or duration of the video-clip"
+            "The provided 'start_time' exceeds the end_time or duration of the video-clip"
             f"---- start_time:     {start_time}"
             f"---- end_time:       {end_time}"
             f"---- video duration: {duration}"
         )
-
-    # duration
-    duration = end_time - start_time
-    cmd += ["-t", str(duration)]
 
     # video filter for fps
     cmd += ["-vf", f"fps={fps}"]
@@ -106,7 +104,7 @@ def extract_frames(
     cmd.append(out_pattern)
     subprocess.run(cmd, check=True)
 
-    frame_paths = Path(temp_dir).glob("frame_*.png")
+    frame_paths = list(Path(temp_dir).glob("frame_*.png"))
 
     return temp_dir, frame_paths
 
@@ -130,9 +128,9 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
         video_info = [{"video_id": v.stem} for v in video_files]
 
     for video_metadata in video_info:
-        video_id = video_metadata["video_id"]
-        start_time = float(video_metadata.get("start", 0))
-        end_time = float(video_metadata.get("end", 0))
+        video_id   = video_metadata["video_id"]
+        start_time = video_metadata.get("start", None)
+        end_time   = video_metadata.get("end", None)
 
         video_path = video_dir / f"{video_id}.mp4"
         if not video_path.exists():
@@ -154,7 +152,7 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
             b64_encodings = []
             for i, frame_path in enumerate(frame_paths):
                 if not Path(frame_path).exists():
-                    print(
+                    logging.warning(
                         f"Warning: Frame {i} was not extracted successfully, skipping"
                     )
                     continue
@@ -169,14 +167,14 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                             }
                         )
                 except Exception as e:
-                    print(f"Error reading frame {i}: {str(e)}")
+                    logging.error(f"Error reading frame {i}: {str(e)}")
                     continue
 
             # Only yield if we have at least one valid frame
             if b64_encodings:
                 yield {**video_metadata, "frames": b64_encodings}
             else:
-                print(f"Warning: No valid frames were extracted for video {video_id}")
+                logging.warning(f"Warning: No valid frames were extracted for video {video_id}")
 
         except Exception as e:
             logging.error(f"Error processing video {video_id}: {str(e)}")

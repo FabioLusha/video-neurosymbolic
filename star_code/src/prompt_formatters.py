@@ -4,25 +4,30 @@ from typing import Dict
 
 class PromptFormatter:
 
-    def __init__(self, prompt_format, fields=None):
+    # TODO: Partially string substitution is not allowed for str.format
+    # Migrate to string.Template
+    def __init__(self, prompt_format, fields=None, required_fields=None):
         self.prompt_format = prompt_format
         self.fields = fields
+        self.field_values = {}
+        self._required_fields = required_fields or self._init_required_fields()
 
-    def init_fields(self, sample) -> Dict[str, str]:
+    def init_fields(self, sample):
         if self.fields:
-            args = dict()
-            args = {field: sample[field] for field in self.fields}
-            return args
-        return {}
+            self.field_values = {field: sample[field] for field in self.fields}
+        return
 
-    def validate_fields(self, fields):
+    def _init_required_fields(self):
         pattern = r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}'
         required_fields = set(re.findall(pattern, self.prompt_format))
 
-        if not required_fields:
+        return required_fields
+
+    def validate_fields(self, fields):
+        if not self._required_fields:
             return
 
-        missing_fields = required_fields - set(fields.keys())
+        missing_fields = set(self._required_fields) - set(fields.keys())
         if missing_fields:
             missing_list = sorted(missing_fields)
             raise ValueError(
@@ -30,10 +35,10 @@ class PromptFormatter:
             )
 
     def format(self, sample):
-        fields = self.init_fields(sample)
-        self.validate_fields(fields)
+        self.init_fields(sample)
+        self.validate_fields(self.field_values)
 
-        return self.prompt_format.format(**fields)
+        return self.prompt_format.format(**self.field_values)
 
 class OpenEndedPrompt(PromptFormatter):
 
@@ -43,8 +48,7 @@ class OpenEndedPrompt(PromptFormatter):
         args["question"] = sample["question"]
         args["stsg"] = sample.get("stsg", None)
 
-        return args
-
+        self.field_values = args
 
 class MCQPrompt(PromptFormatter):
 
@@ -60,7 +64,7 @@ class MCQPrompt(PromptFormatter):
 
         args["stsg"] = str(sample["stsg"])
 
-        return args
+        self.field_values = args
 
 
 class MCQPromptWoutSTSG(PromptFormatter):
@@ -70,13 +74,12 @@ class MCQPromptWoutSTSG(PromptFormatter):
 
         args["question"] = sample["question"]
 
-        choices = [f"{key}. {val}" for key, val in sample["choices"].items()]
         args["c1"] = sample["choices"]["0"]
         args["c2"] = sample["choices"]["1"]
         args["c3"] = sample["choices"]["2"]
         args["c4"] = sample["choices"]["3"]
 
-        return args
+        self.field_values = args
 
 
 class LlmAsJudgePrompt(PromptFormatter):
@@ -84,20 +87,16 @@ class LlmAsJudgePrompt(PromptFormatter):
     def init_fields(self, sample):
         args = dict()
 
-        qid = sample["question_id"]
-
         args["question"] = sample["question"]
         args["gt_answer"] = sample["answer"]
         args["prediction"] = sample["response"]
 
-        return args
+        self.field_values = args
 
 
 class LlmAsJudgePromptForMCQ(LlmAsJudgePrompt):
     def init_fields(self, sample):
         args = dict()
-
-        qid = sample["question_id"]
 
         args["question"] = sample["question"]
 
@@ -110,4 +109,23 @@ class LlmAsJudgePromptForMCQ(LlmAsJudgePrompt):
         args["gt_answer"] = sample["answer"]
         args["prediction"] = sample["response"]
 
-        return args
+        self.field_values = args
+
+
+class ImgPromptDecorator:
+
+    def __init__(self, wrapped_formatter, img_field="images", tag="[img]"):
+        self.wrapped_formatter = wrapped_formatter
+        self.img_field = img_field
+        self.tag = tag
+
+    def format(self, sample):
+        n_imgs = len(sample[self.img_field])
+        images_text = "".join([f"\n\nImage {i}:\n{self.tag}" for i in range(n_imgs)])
+
+        self.wrapped_formatter.field_values[self.img_field] = images_text
+        
+        return self.wrapped_formatter.format(sample)
+        
+    def __getattr__(self, name):
+        return getattr(self.wrapped_formatter, name)

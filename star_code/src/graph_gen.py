@@ -1,16 +1,12 @@
 import argparse
-import base64
 import json
 import os
 import re
-import shutil
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 from . import batch_processor
 from .ollama_manager import OllamaRequestManager
+from .prompt_formatters import ImgPromptDecorator, PromptFormatter
 from .video_tools import generate_frames
 
 SEED = 13471225022025
@@ -103,7 +99,11 @@ def parse_arguments():
         type=str,
         help='Path to a JSON file containing model options'
     )
-    
+    parser.add_argument(
+        '--batch-images',
+        action='store_true',
+        help='If set, send all extracted frames for a video in a single batch request'
+    )
     
     return parser.parse_args()
 
@@ -173,6 +173,7 @@ def main():
         usr_prompt=usr_prompt,
         reply=reply,
         fps=args.fps,
+        batch_images=args.batch_images,
     )
 
 def preprocess_videos_metadata(dataset):
@@ -243,7 +244,87 @@ def frame_aggregator(stream):
     except StopIteration:
         return  # Handle case when stream is empty
 
-def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_prompt, reply, video_info=None, iters=-1, fps=1.0):
+
+def img_payload_gen(
+    ollama_params,
+    situations,
+    usr_prompt,
+    batch_images=False
+):
+
+    for video in situations:
+        video_id = video["video_id"]
+        start = video.get("start", None)
+        end = video.get("end", None)
+
+        frames = video["frames"]
+        print(f"\nVideo: {video_id}")
+        print(f" - interval: {start}-{end}")
+        print(f" - {len(frames)} frames.")
+
+
+        payloads = []
+        if not frames:
+            print(f"Warning: Couldn't extract frames from video {video_id}. Skipping")
+
+        if batch_images:
+            img_pformatter = ImgPromptDecorator(
+                    PromptFormatter(usr_prompt), 
+                    img_field="images",
+                    tag="[img]"
+            )
+            usr_promtp_wtags = img_pformatter.format({"images": frames})
+            req_obj = {
+                # qid for backward compatibility
+                "qid": video_id,
+                **video,
+                "payload": {
+                    **ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": usr_promtp_wtags,
+                            "images": [f["encoding"] for f in frames],
+                        }
+                    ],
+                },
+            }
+            payloads = [req_obj]
+        else:
+            for frame in frames:
+                req_obj = {
+                    # qid for backward compatibility
+                    "qid": video_id,
+                    **video,
+                    "frame_id": frame["frame_id"],
+                    "payload": {
+                        **ollama_params,
+                        "messages": [
+                            {
+                            "role": "user",
+                                "content": usr_prompt,
+                                "images": [frame["encoding"]],
+                            }
+                        ],
+                    },
+                }
+
+                payloads.append(req_obj)
+
+        for payload in payloads:
+            yield payload
+
+
+def streaming_frame_generation(
+    ollama_client,
+    video_dir,
+    output_file_path,
+    usr_prompt,
+    reply,
+    video_info=None,
+    fps=1.0,
+    batch_images=False
+):
     """
     Generate scene graph descriptions for video frames.
     Args:
@@ -253,55 +334,34 @@ def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_p
         iters: Number of iterations to run (-1 for all data)
         fps: Frames per second to sample per video
     """
-    def payload_gen(situations):
-        for video in situations:
-            video_id = video['video_id']
-            start = video.get('start', None)
-            end = video.get('end', None)
-
-            print(f"\nVideo: {video_id}")
-            print(f" - interval: {start}-{end}")
-            print(f" - {len(video['frames'])} frames.")
-            
-            for frame in video['frames']:
-                req_obj = {
-                    # qid for backward compatibility
-                    "qid": video_id,
-                    "video_id": video_id,
-                    "start": start,
-                    "end": end,
-                    "frame_id": frame["frame_id"],
-                    "payload": {
-                        **ollama_client.ollama_params,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": usr_prompt,
-                                "images": [frame["encoding"]],
-                            }
-                        ],
-                    },
-                }
-
-                yield req_obj
 
     bp = batch_processor
     graph_gen_pipeline = bp.Pipeline(
-        payload_gen,
+        lambda situations: img_payload_gen(
+            ollama_client.ollama_params,
+            situations,
+            usr_prompt,
+            batch_images
+        ),
         lambda payload_gen: bp.stream_request(
             payload_gen, ollama_client, endpoint="chat"
         ),
         lambda stream: bp.auto_reply_gen(stream, reply),
         # check the response is ok before passing to frame_extraction,
         lambda stream: (o for o in stream if o["status"] == "ok"),
-        lambda stream: (
-            {
-                **stream_obj,
-                "sg": extract_frame_description(stream_obj["response"]["content"]),
-            }
-            for stream_obj in stream
-        ),
-        lambda stream: frame_aggregator(stream),
+        # For now (using batch) let's disable the aggregation
+        #
+        #lambda stream: (
+        #    {
+        #        **stream_obj,
+        #        "sg": extract_frame_description(stream_obj["response"]["content"]),
+        #    }
+        #    for stream_obj in stream
+        #),
+        #lambda stream: frame_aggregator(stream),
+        #
+        # Introduce spurious modifier to satisfy GeneratedGraphFormatter interface
+        lambda stream: ({**stream_obj, "stsg": stream_obj["response"]["content"]} for stream_obj in stream),
         lambda stream: bp.stream_save(
             stream, bp.GeneratedGraphFormatter(), output_file_path
         ),

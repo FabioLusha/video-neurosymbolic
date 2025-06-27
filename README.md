@@ -152,11 +152,12 @@ python -m star_code.src.graph_gen \
   --model gemma3:4b-it-qat \
   --model-options star_code/ollama_model_options.json \
   --video-dir star_code/data/datasets/action-genome/Charades_v1_480 \
-  --videos-metadata star_code/data/datasets/STAR/STAR_annotations/STAR_val.json \
-  --output-file outputs/generated_stsg.jsonl \
-  --usr-prompt star_code/data/prompts/graph_gen/usr_prompt.txt \
-  --auto-reply star_code/data/prompts/graph_gen/format_instructions.txt \
-  --max-samples 5
+  --videos-metadata star_code/data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json \
+  --usr-prompt star_code/data/prompts/graph-gen/usr_prompt_v2.txt \
+  --auto-reply star_code/data/prompts/graph-gen/format_instructions_v2.txt \
+  --output-file star_code/outputs/gen_stsg_videofps_gemma3:4b-it-qat_20250627_23:16:00.jsonl \
+  --fps 1 \
+  --batch-images
 ```
 
 ### Graph Understanding
