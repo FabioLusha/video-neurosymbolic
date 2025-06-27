@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import batch_processor
 from .ollama_manager import OllamaRequestManager
+from .video_tools import generate_frames
 
 SEED = 13471225022025
 
@@ -70,10 +71,10 @@ def parse_arguments():
     )
     
     parser.add_argument(
-        '--max-samples',
-        type=int,
-        default=10,
-        help='Maximum number of frames to sample per video (default: 10)'
+        '--fps',
+        type=float,
+        default=1.0,
+        help='Frames per second to sample from each video (default: 1.0)'
     )
     
     parser.add_argument(
@@ -171,7 +172,7 @@ def main():
         video_info=video_info,
         usr_prompt=usr_prompt,
         reply=reply,
-        max_samples=args.max_samples,
+        fps=args.fps,
     )
 
 def preprocess_videos_metadata(dataset):
@@ -195,169 +196,6 @@ def preprocess_videos_metadata(dataset):
         })
 
     return video_info
-
-
-
-def get_video_duration(video_path):
-    """Get the duration of the video in seconds."""
-    cmd = [
-        'ffprobe',
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'json',
-        video_path
-    ]
-    
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
-    if result.returncode != 0:
-        print(f"Error getting video duration: {result.stderr.decode()}")
-        sys.exit(1)
-    
-    data = json.loads(result.stdout)
-    return float(data['format']['duration'])
-
-
-def extract_frames(video_path, num_frames, max_fps=1, output_dir=None, start_time=None, end_time=None):
-    """Extract num_frames uniformly sampled frames from the video within specified time range.
-    
-    Args:
-        video_path: Path to the video file
-        num_frames: Number of frames to extract
-        output_dir: Directory to save frames (optional)
-        start_time: Start time in seconds (default: 0)
-        end_time: End time in seconds (default: None, meaning end of video)
-    """
-    # Create temporary output directory
-    temp_dir = tempfile.mkdtemp()
-    if output_dir:
-        temp_dir = output_dir
-    
-    # Get video duration
-    duration = get_video_duration(video_path)
-    
-    if start_time is None:
-        start_time = 0
-    # Set end_time if not provided
-    if end_time is None or end_time > duration:
-        end_time = duration
-    
-    # Ensure start_time is within valid range
-    start_time = max(0, min(start_time, end_time - 0.1))
-    
-    # Limit the FPS sampling
-    if num_frames / (end_time - start_time) > max_fps:
-        num_frames = int((end_time - start_time) / max_fps)
-    # Calculate time intervals within the specified range
-    if num_frames <= 1:
-        intervals = [(start_time + end_time) / 2]  # Just the middle of the range
-    else:
-        # Calculate time points within the specified range
-        intervals = [start_time + i * (end_time - start_time) / (num_frames - 1) 
-                    for i in range(num_frames)]
-        
-        # Adjust the first and last intervals slightly to avoid black frames
-        if num_frames > 1:
-            intervals[0] = max(start_time + 0.1, intervals[0])  # Avoid the very beginning
-            intervals[-1] = min(end_time - 0.1, intervals[-1])  # Avoid the very end
-    
-    frame_paths = []
-    # Extract frames at calculated intervals
-    for i, time_point in enumerate(intervals):
-        output_file = os.path.join(temp_dir, f"frame_{i:04d}.jpg")
-        frame_paths.append(output_file)
-        
-        cmd = [
-            'ffmpeg',
-            '-ss', str(time_point),  # Seek to time position
-            '-i', video_path,        # Input file
-            '-vframes', '1',         # Extract just one frame
-            '-q:v', '2',             # Quality (2 is high quality, lower values are better)
-            output_file
-        ]
-        
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
-        if result.returncode != 0:
-            print(f"Error extracting frame at {time_point}s: {result.stderr.decode()}")
-        else:
-            print(f"Extracted frame at {time_point:.2f}s: {output_file}")
-    
-    return temp_dir, frame_paths
-
-def generate_frames(video_dir, video_info=None, num_frames=10):
-    """
-    Generate frames from specific videos in a directory with custom time ranges.
-    
-    Args:
-        video_dir: Directory containing video files
-        video_info: Dictionary in format {video_id: {'start': s, 'end': e}}
-        num_frames: Number of frames to sample per video
-        
-    Yields:
-        List of frames with their base64 encodings
-    """
-    video_dir = Path(video_dir)
-    
-    if video_info is None:
-        video_files = list(video_dir.glob("*.mp4"))
-        video_info = [{'video_id': v.stem} for v in video_files]
-        
-    for video_metadata in video_info:
-        video_id = video_metadata['video_id']
-        start_time = video_metadata.get('start', None)
-        end_time = video_metadata.get('end', None)
-
-        video_path = video_dir / f"{video_id}.mp4"
-        if not video_path.exists():
-            print(f"Warning: Video {video_id}.mp4 not found in {video_dir}")
-            continue
-
-        try:
-            # Extract frames from video within specified time range
-            temp_dir, frame_paths = extract_frames(
-                video_path, 
-                num_frames,
-                start_time=start_time,
-                end_time=end_time
-            )
-            
-            # Convert frames to base64
-            b64_encodings = []
-            for i, frame_path in enumerate(frame_paths):
-                if not os.path.exists(frame_path):
-                    print(f"Warning: Frame {i} was not extracted successfully, skipping")
-                    continue
-                    
-                try:
-                    with open(frame_path, "rb") as f:
-                        img_bytes = f.read()
-                        b64_encodings.append(
-                            {
-                                "frame_id": i,
-                                "encoding": base64.b64encode(img_bytes).decode("utf-8"),
-                            }
-                        )
-                except Exception as e:
-                    print(f"Error reading frame {i}: {str(e)}")
-                    continue
-
-            # Only yield if we have at least one valid frame
-            if b64_encodings:
-                yield {**video_metadata, 'frames': b64_encodings}
-            else:
-                print(f"Warning: No valid frames were extracted for video {video_id}")
-
-        except Exception as e:
-            print(f"Error processing video {video_id}: {str(e)}")
-            continue
-        finally:
-            # Clean up temporary files
-            if 'temp_dir' in locals():
-                try:
-                    shutil.rmtree(temp_dir)
-                except Exception as e:
-                    print(f"Warning: Error cleaning up temporary directory: {str(e)}")
 
 def extract_frame_description(text):
     """
@@ -405,18 +243,16 @@ def frame_aggregator(stream):
     except StopIteration:
         return  # Handle case when stream is empty
 
-def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_prompt, reply, video_info=None, iters=-1, max_samples=10):
+def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_prompt, reply, video_info=None, iters=-1, fps=1.0):
     """
     Generate scene graph descriptions for video frames.
-    
     Args:
         ollama_client: OllamaRequestManager instance
         output_file_path: Path to save the generated descriptions
         video_info: Dictionary[ video_id -> metadata] metadata of the videos
         iters: Number of iterations to run (-1 for all data)
-        max_samples: Maximum number of frames to sample per video
+        fps: Frames per second to sample per video
     """
-    
     def payload_gen(situations):
         for video in situations:
             video_id = video['video_id']
@@ -471,10 +307,9 @@ def streaming_frame_generation(ollama_client, video_dir, output_file_path, usr_p
         ),
     )
 
-    
     situations = (
         situation_frames
-        for situation_frames in generate_frames(video_dir, video_info, num_frames=max_samples)
+        for situation_frames in generate_frames(video_dir, fps, video_info=video_info)
     )
     graph_gen_pipeline.consume(situations)
     return

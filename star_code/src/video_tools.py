@@ -5,6 +5,13 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+import logging
+
+logging.basicConfig(
+    filename='video_tools.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(message)s'
+)
 
 
 def get_video_stream_info(video_path):
@@ -24,7 +31,7 @@ def get_video_stream_info(video_path):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     if result.returncode != 0:
-        print(f"Error getting video duration: {result.stderr.decode()}")
+        logging.error(f"Error getting video duration: {result.stderr.decode()}")
         sys.exit(1)
 
     data = json.loads(result.stdout)["streams"][0]
@@ -129,7 +136,7 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
 
         video_path = video_dir / f"{video_id}.mp4"
         if not video_path.exists():
-            print(f"Warning: Video {video_id}.mp4 not found in {video_dir}")
+            logging.warning(f"Warning: Video {video_id}.mp4 not found in {video_dir}")
             continue
 
         try:
@@ -172,7 +179,7 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                 print(f"Warning: No valid frames were extracted for video {video_id}")
 
         except Exception as e:
-            print(f"Error processing video {video_id}: {str(e)}")
+            logging.error(f"Error processing video {video_id}: {str(e)}")
             continue
         finally:
             # Clean up temporary files
@@ -180,4 +187,4 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
-                    print(f"Warning: Error cleaning up temporary directory: {str(e)}")
+                    logging.warning(f"Warning: Error cleaning up temporary directory: {str(e)}")
