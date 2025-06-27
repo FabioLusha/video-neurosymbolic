@@ -35,9 +35,9 @@ def extract_frames(
     video_path,
     fps=1,
     max_frames=None,
-    output_dir=None,
     start_time=0.0,
     end_time=0.0,
+    output_dir=None,
 ):
     """Extract num_frames uniformly sampled frames from the video within specified time range.
 
@@ -52,13 +52,13 @@ def extract_frames(
     temp_dir = tempfile.mkdtemp()
     if output_dir:
         temp_dir = output_dir
+        Path(temp_dir).mkdir(parents=True, exist_ok=True)
 
     # Get video duration
     duration = float(get_video_stream_info(video_path)["duration"])
 
     cmd = [
         "ffmpeg",
-        "-hide-banner",
         "-loglevel",
         "error",
     ]
@@ -67,6 +67,7 @@ def extract_frames(
     if start_time and start_time > 0:
         cmd += ["-ss", str(start_time)]
 
+    cmd += ["-i", video_path]
     # Set end_time if not provided
     # not 0.0 := True
     if not end_time or end_time > duration:
@@ -85,17 +86,16 @@ def extract_frames(
     cmd += ["-t", str(duration)]
 
     # video filter for fps
-    cmd += ["-fv", f"fps={fps}"]
+    cmd += ["-vf", f"fps={fps}"]
 
     # Limit the number of frames
     if max_frames:
         cmd += ["-frames:v", str(max_frames)]
 
     # Quality (2 is high qyality, lower values are better)
-    cmd += ["-q:v", 2]
+    cmd += ["-q:v", "2"]
 
-    out_pattern = f"{temp_dir}/frame_%06d.png"
-
+    out_pattern = str(Path(temp_dir, "frame_%06d.png"))
     cmd.append(out_pattern)
     subprocess.run(cmd, check=True)
 
@@ -104,7 +104,7 @@ def extract_frames(
     return temp_dir, frame_paths
 
 
-def generate_frames(video_dir, fps, video_info=None, **kwargs):
+def generate_frames(video_dir, fps, video_info=None, output_dir=None):
     """
     Generate frames from specific videos in a directory with custom time ranges.
 
@@ -120,12 +120,12 @@ def generate_frames(video_dir, fps, video_info=None, **kwargs):
 
     if video_info is None:
         video_files = list(video_dir.glob("*.mp4"))
-        video_info  = [{"video_id": v.stem} for v in video_files]
+        video_info = [{"video_id": v.stem} for v in video_files]
 
     for video_metadata in video_info:
-        video_id   = video_metadata["video_id"]
+        video_id = video_metadata["video_id"]
         start_time = float(video_metadata.get("start", 0))
-        end_time   = float(video_metadata.get("end", 0))
+        end_time = float(video_metadata.get("end", 0))
 
         video_path = video_dir / f"{video_id}.mp4"
         if not video_path.exists():
@@ -133,13 +133,14 @@ def generate_frames(video_dir, fps, video_info=None, **kwargs):
             continue
 
         try:
+            video_frames_dir = Path(output_dir, f"{video_id}.mp4") if output_dir else None
             # Extract frames from video within specified time range
             temp_dir, frame_paths = extract_frames(
                 video_path,
                 fps,
                 start_time=start_time,
                 end_time=end_time,
-                **kwargs,
+                output_dir=video_frames_dir,
             )
 
             # Convert frames to base64
@@ -175,7 +176,7 @@ def generate_frames(video_dir, fps, video_info=None, **kwargs):
             continue
         finally:
             # Clean up temporary files
-            if "temp_dir" in locals():
+            if not output_dir and "temp_dir" in locals():
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
