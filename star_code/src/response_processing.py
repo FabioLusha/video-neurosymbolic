@@ -124,6 +124,7 @@ def gemma3_ans_extract(input_filepath):
 
     json_pattern = r"^(?:```json\s)?({[^}]+})(?:\s```)?"
     json_mask = predictions_df["answer"].str.match(json_pattern)
+    predictions_df['json_mask'] = json_mask
     matches_json_template = json_mask.sum()
 
     print(f"Total answers: {len(predictions_df)}")
@@ -132,15 +133,16 @@ def gemma3_ans_extract(input_filepath):
         f"Percentage following JSON template: {(matches_json_template/len(predictions_df))*100:.2f}%"
     )
 
-    predictions_df.loc[json_mask, "answer"] = predictions_df.loc[
-        json_mask, "answer"
-    ].apply(lambda x: re.search(json_pattern, x).group(1))
+    original_df = predictions_df[['chat_history', 'json_mask']].copy()
 
-    predictions_df.loc[~json_mask, "answer"] = ""
+    predictions_df = predictions_df.loc[json_mask]
+    predictions_df["answer"] = \
+        predictions_df["answer"] \
+        .apply(lambda x: re.search(json_pattern, x).group(1))
 
     # ---------------- Removing enoding errors
     # Replace new line (lead to EOF Errors) with whitespace
-    predictions_df["answer"] = predictions_df["answer"].str.replace(
+    predictions_df.loc[json_mask, "answer"] = predictions_df.loc[json_mask, "answer"].str.replace(
         "\n+", " ", regex=True
     )
 
@@ -171,14 +173,14 @@ def gemma3_ans_extract(input_filepath):
         axis=1,
     )
 
-    predictions_df.loc[json_mask, "answer"] = predictions_df.loc[
-        json_mask, "answer"
-    ].apply(lambda x: eval(x)["answer"].strip())
+    predictions_df["answer"] = \
+        predictions_df["answer"] \
+        .apply(lambda x: eval(x)["answer"].strip())
 
     ans_regex_pattern = r"^(?:[A-Z]\.)\s+((?:\w+(?:\s|\/)?){,10}\.?)"
-    contains_answer = predictions_df["answer"].str.contains(
-        ans_regex_pattern, regex=True
-    )
+    contains_answer = \
+        predictions_df["answer"] \
+        .str.contains(ans_regex_pattern, regex=True)
 
     print(
         f"Answer following the template: {contains_answer.value_counts()[True]}\n"
@@ -199,5 +201,11 @@ def gemma3_ans_extract(input_filepath):
     )
 
     ans_df["answer"] = ans_df["answer"].str.strip()
-    ans_df["chat_history"] = predictions_df["chat_history"]
-    return ans_df
+
+    original_df.loc[:, "contains_answer"] = False
+    original_df.loc[contains_answer, "contains_answer"] = contains_answer
+
+    original_df.loc[:, "answer"] = None
+    original_df.loc[contains_answer, "answer"] = ans_df["answer"]
+
+    return original_df

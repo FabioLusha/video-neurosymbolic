@@ -2,16 +2,9 @@ import argparse
 import json
 
 # relative imports work only with the 'from' form of the import
-from . import batch_processor, frames_tools
-from ._const import (
-    BASE_DIR,
-    DEFAULT_INPUT_FILE,
-    DEFAULT_MODEL_OPTIONS,
-    DEFAULT_PROMPTS,
-    OLLAMA_URL,
-    PROMPT_TYPES,
-    TASK_TYPES,
-)
+from . import batch_processor, frames_tools, video_tools
+from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
+                     DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
 
@@ -102,6 +95,18 @@ def main():
         help="Maximum number of frames to sample per video (default: 5)",
     )
 
+    parser.add_argument(
+        "--videos-dir",
+        type=str,
+        help="Directory with the videos associated to the questions",
+    )
+
+    parser.add_argument(
+        "--fps",
+        type=float,
+        help="frame-rate at which to sample images from the videos"
+    )
+
     args = parser.parse_args()
 
     # Step 2: Load prompts
@@ -149,7 +154,7 @@ def main():
     if args.task == "graph-understanding" or args.task == "vqa":
         # TODO:
         # For Now VQA is set only for chat mode and is inside the condition of what
-        # to apply is incide process_promtps
+        # to apply is inside process_promtps
         process_prompts(ollama_client, dataset, args.mode, args, args.output_file)
 
 
@@ -237,34 +242,41 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
         if args.task == "vqa":
             if args.dataset_type == "star":
 
-                if not args.keyframes_info:
-                    raise ValueError(
-                        "When using VQA task frames mode you need to provide file with keyframes data"
+                if args.frames_dir:
+                    if not args.keyframes_info:
+                        raise ValueError(
+                            "When using VQA task frames mode you need to provide file with keyframes data"
+                        )
+
+                    print(f"=== Loading file with videos metadata: {args.keyframes_info}")
+                    # remove duplicates and keeps only relevant metadata
+                    video_keyframes_info = frames_tools.extract_video_keyframes_info(
+                        args.keyframes_info
+                    )
+                    videos_info = frames_tools.preprocess_videos_metadata(
+                        dataset, video_keyframes_info, filter=False
                     )
 
-                print(f"=== Loading file with videos metadata: {args.keyframes_info}")
-                # remove duplicates and keeps only relevant metadata
-
-                video_keyframes_info = frames_tools.extract_video_keyframes_info(
-                    args.keyframes_info
-                )
-                videos_info = frames_tools.preprocess_videos_metadata(
-                    dataset, video_keyframes_info, filter=False
-                )
-
-
-                stream_vqa(
-                    ollama_client,
-                    dataset,
-                    reply,
-                    args.frames_dir,
-                    videos_info,
-                    args.max_samples,
-                    output_filepath,
-                )
-
+                    stream_vqa(
+                        ollama_client,
+                        dataset,
+                        reply,
+                        args.frames_dir,
+                        videos_info,
+                        args.max_samples,
+                        output_filepath,
+                    )
+                elif args.videos_dir:
+                    stream_vqa_video(
+                        ollama_client   =  ollama_client,
+                        dataset         = dataset,
+                        reply           = reply,
+                        videos_dir      = args.videos_dir,
+                        fps             = args.fps,
+                        output_filepath = output_filepath,
+                    )
             else:
-                raise NotImplementedError("The VQA works for only the star dataset")
+                raise NotImplementedError("The VQA works only for the STAR dataset")
 
         else:
             reply = _load_prompt_fromfile(args.reply_file)
@@ -277,7 +289,13 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
 
 
 def stream_vqa(
-    ollama_client, dataset, reply, frames_dir, videos_info, max_sample, output_filepath
+    ollama_client,
+    dataset,
+    reply,
+    frames_dir,
+    videos_info,
+    max_sample,
+    output_filepath
 ):
 
     def _payload_gen(dataset, videos_info):
@@ -316,6 +334,70 @@ def stream_vqa(
     pipeline = bp.Pipeline(
         # the first generator converts the prompt to the right format
         lambda dataset_gen: _payload_gen(dataset_gen, videos_info),
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
+        lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
+        lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),
+        lambda resp_stream: bp.stream_save(
+            resp_stream, bp.ChatResponseFormatter(), output_filepath
+        ),
+    )
+
+    pipeline.consume(dataset)
+    return
+
+
+def stream_vqa_video(
+    ollama_client,
+    dataset,
+    reply,
+    videos_dir,
+    fps,
+    output_filepath
+):
+
+    def _payload_gen(dataset):
+
+        for datum in dataset:
+            question_id = datum["question_id"]
+            video_id = datum['video_id']
+            start = datum.get('start', None)
+            end = datum.get('end', None)
+
+            keyframes = video_tools.generate_video_frames(
+                f"{videos_dir}/{video_id}.mp4",
+                fps,
+                start,
+                end,
+            )
+
+            if not keyframes:
+                print(
+                    f"Warning! Couldn't extract frames for question <{question_id}>. Skipping..."
+                )
+                continue
+
+            encodings = [frame["encoding"] for frame in keyframes]
+
+            req_obj = {
+                "qid": question_id,  # situation is list of [{question_id, frame_id, encoding}]
+                "payload": {
+                    **ollama_client.ollama_params,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": datum["prompt"],
+                            "images": encodings,
+                        }
+                    ],
+                },
+            }
+
+            yield req_obj
+
+    bp = batch_processor
+    pipeline = bp.Pipeline(
+        # the first generator converts the prompt to the right format
+        lambda dataset_gen: _payload_gen(dataset_gen),
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
         lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
         lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),

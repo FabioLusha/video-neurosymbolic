@@ -2,14 +2,35 @@ import json
 import os
 import traceback
 from datetime import datetime
-
 import requests
+from pathlib import Path
+import logging
+
+# star_code
+BASE_DIR = Path.cwd().parent / "logs"
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.NOTSET)
+
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch_fmt = logging.Formatter("%(asctime)s - %(name)s - [%(levelname)s] :- %(message)s")
+ch.setFormatter(ch_fmt)
+
+fh = logging.FileHandler(str(BASE_DIR / "star_code.log"))
+fh.setLevel(logging.WARNING)
+fh.setFormatter(ch_fmt)
+
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 
 class Pipeline:
 
     def __init__(self, *generators_funs):
-        self.generator_transforms = generators_funs
+        self.generator_transforms = list(generators_funs)
 
         # Compose the generators
         self.pipeline = self.generator_transforms[0]
@@ -47,13 +68,13 @@ def stream_request(
 ):
     consecutive_errors = 0
 
-    print(" Starting Response Generation ".center(80, "="))
+    logger.info(" Starting Response Generation ".center(80, "="))
     for i, sample in enumerate(payload_gen, 1):
         id = sample["qid"]
         payload = sample["payload"]
 
         try:
-            print(f"\nGenerating response for iteration {i} - id: {id}")
+            logger.info(f"\nGenerating response for iteration {i} - id: {id}")
             response = ollama_client.ollama_completion_request(
                 payload, endpoint, **kwargs
             )
@@ -75,7 +96,7 @@ def stream_request(
             # partial response
             consecutive_errors += 1
             if consecutive_errors > consecutive_errors_thresh:
-                print(
+                logger.critical(
                     f"There have been more than {consecutive_errors_thresh} consecutive errors! Stopping the program!"
                 )
                 raise ValueError(
@@ -109,7 +130,7 @@ def stream_save(
 
         # Create directory if it doesn't exists
         output_dir = os.path.dirname(output_file_path)
-        output_dir = output_dir if output_dir != "" or output_dir == None else "outputs"
+        output_dir = output_dir if (output_dir  is not None) and (output_dir != "") else "outputs"
         os.makedirs(output_dir, exist_ok=True)
 
     else:
@@ -143,9 +164,9 @@ def stream_save(
         log_file_path = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
     if copy_counter > 1:
-        print(f"File {orig_ofile} already exists!\r")
-    print(f"Responses will be saved to: {output_file_path}")
-    print(f"Errors will be logged to: {log_file_path}")
+        logging.warning(f"File {orig_ofile} already exists!\r")
+    logging.info(f"Responses will be saved to: {output_file_path}")
+    logging.info(f"Errors will be logged to: {log_file_path}")
 
     # Using line buffering
     with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
@@ -172,7 +193,7 @@ def stream_save(
                     #res_f.write(json.dumps(response_file_msg) + "\n")
                     #res_f.flush()
 
-                    print(
+                    logger.warning(
                         f"Error at iteration {i}\n"
                         f"Prompt id:{id}\n"
                         "Look at the log file for specifics on the error"
@@ -240,10 +261,27 @@ def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=N
 
 class ResponseFormatter:
     def format_response(self, response_data):
-        pass
+        success_response = {
+            "qid": response_data["id"],
+            "response": response_data["response"]
+        }
+        return success_response
 
     def format_error_response(self, response_data):
-        pass
+        error_response_message = {
+            "qid": response_data["id"],
+            "response": "",
+        }
+
+        error_log = {
+            "qid": response_data["id"],
+            "payload": None,
+            "response": response_data["payload"],
+            "error": None,
+            "timestamp": None,
+        }
+
+        return error_log, error_response_message
 
 
 class GenerateResponseFormatter(ResponseFormatter):
@@ -255,7 +293,7 @@ class GenerateResponseFormatter(ResponseFormatter):
         return success_response
 
     def format_error_response(self, response_data):
-        error = response_data["error"]
+        error = response_data.get("error")
         traceback_text = ""
         if hasattr(error, "__traceback__"):
             tb = error.__traceback__
@@ -311,9 +349,8 @@ class ChatResponseFormatter(ResponseFormatter):
             tb_lines = traceback.format_exception(type(error), error, tb)
             traceback_text = "".join(tb_lines)
 
-        partial_error_response = getattr(error, "response", "")
+        partial_error_response = getattr(error, "response", {})
 
-        print(response_data.keys())
         chat_history = response_data["messages"]
         chat_history.append(
             {
@@ -350,7 +387,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
         )
         # remove img encoding from the chat_history
         if "images" in chat_history[0]:
-            print("Removing image entry")
+            logging.info("Removing image entry")
             del chat_history[0]["images"]
 
         stsg = response_data["stsg"]
@@ -376,7 +413,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
             tb_lines = traceback.format_exception(type(error), error, tb)
             traceback_text = "".join(tb_lines)
 
-        partial_error_response = getattr(error, "response", "")
+        partial_error_response = getattr(error, "response", {})
 
         chat_history = response_data["payload"]["message"]
         chat_history.append(
@@ -387,7 +424,6 @@ class GeneratedGraphFormatter(ResponseFormatter):
             }
         )
 
-        print(f"Chat history keys: {chat_history[0].keys()}")
         if "images" in chat_history[0]:    
             del chat_history[0]["images"]
 
@@ -437,17 +473,14 @@ class StreamSaver:
 
         error_file = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
-        print(f"Responses will be saved to: {output_file_path}")
-        print(f"Errors will be logged to: {error_file}")
+        logging.info(f"Responses will be saved to: {output_file_path}")
+        logging.info(f"Errors will be logged to: {error_file}")
 
         self.response_generator = response_generator
         self.response_formatter = response_formatter
 
         self.output_file_path = output_file_path
         self.error_file_path = error_file
-
-        self.res_f = None
-        self.error_f = None
 
     def __enter__(self):
         self.res_f = open(self.output_file_path, "w", buffering=1, encoding="utf-8")
@@ -483,7 +516,7 @@ class StreamSaver:
                     self.res_f.write(json.dumps(response_file_msg) + "\n")
                     self.res_f.flush()
 
-                    print(
+                    logger.warning(
                         f"Error at iteration {i}\n"
                         f"Prompt id:{id}\n"
                         "Look at the log file for specifics on the error"
