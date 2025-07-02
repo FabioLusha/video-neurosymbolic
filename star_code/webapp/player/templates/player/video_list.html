@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video List</title>
+</head>
+<body>
+    <h1>Uploaded Videos</h1>
+    <a href="/upload/">Upload a new video</a>
+    <ul>
+        {% for video in videos %}
+        <li>
+            <strong>{{ video.title }}</strong><br>
+            <video width="320" height="240" controls>
+                <source src="{{ video.file.url }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </li>
+        {% empty %}
+        <li>No videos uploaded yet.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html> 

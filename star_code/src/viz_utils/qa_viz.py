@@ -1,3 +1,7 @@
+import requests
+import webbrowser
+import os
+
 def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
 
     if predictor_labels:
@@ -38,3 +42,23 @@ def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
         print("\n".join([f"│        {line}" for line in reasoning.split("\n")]))
     print("│")
     print("└" + "─" * 85)
+
+def upload_and_visualize_video(videopath, server_url="http://localhost:10882"):
+    """
+    Uploads a video to the Django server and opens the browser to visualize it.
+    Args:
+        videopath (str): Path to the video file to upload.
+        server_url (str): Base URL of the Django server.
+    """
+    upload_url = f"{server_url}/upload/"
+    video_title = os.path.basename(videopath)
+    with open(videopath, 'rb') as f:
+        files = {'file': (video_title, f, 'video/mp4')}
+        data = {'title': video_title}
+        response = requests.post(upload_url, files=files, data=data)
+        if response.status_code == 200 or response.status_code == 302:
+            print(f"Video '{video_title}' uploaded successfully.")
+            webbrowser.open(server_url)
+        else:
+            print(f"Failed to upload video. Status code: {response.status_code}")
+            print(response.text)
