@@ -47,6 +47,7 @@ responses
 
 # huggingface
 transformers
+datasets
 
 wordcloud
 urllib3

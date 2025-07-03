@@ -7,21 +7,27 @@ from pathlib import Path
 import logging
 
 # star_code
-BASE_DIR = Path.cwd().parent / "logs"
+BASE_DIR = Path(__file__).parent / "logs"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.NOTSET)
+logger.setLevel(logging.DEBUG)
 
 # create console handler
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ch_fmt = logging.Formatter("%(asctime)s - %(name)s - [%(levelname)s] :- %(message)s")
+ch.setLevel(logging.NOTSET) # delegate filtering to logger
+ch_fmt = logging.Formatter(
+    "=[%(levelname)s] :- %(message)s"
+)
 ch.setFormatter(ch_fmt)
 
 fh = logging.FileHandler(str(BASE_DIR / "star_code.log"))
 fh.setLevel(logging.WARNING)
-fh.setFormatter(ch_fmt)
+fh_fmt = logging.Formatter(
+    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+fh.setFormatter(fh_fmt)
 
 logger.addHandler(ch)
 logger.addHandler(fh)
@@ -68,13 +74,13 @@ def stream_request(
 ):
     consecutive_errors = 0
 
-    logger.info(" Starting Response Generation ".center(80, "="))
+    logger.info(" Starting Response Generation ".center(40, "="))
     for i, sample in enumerate(payload_gen, 1):
         id = sample["qid"]
         payload = sample["payload"]
 
         try:
-            logger.info(f"\nGenerating response for iteration {i} - id: {id}")
+            logger.info(f"Generating response for iteration {i} - id: {id}")
             response = ollama_client.ollama_completion_request(
                 payload, endpoint, **kwargs
             )
@@ -164,9 +170,9 @@ def stream_save(
         log_file_path = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
     if copy_counter > 1:
-        logging.warning(f"File {orig_ofile} already exists!\r")
-    logging.info(f"Responses will be saved to: {output_file_path}")
-    logging.info(f"Errors will be logged to: {log_file_path}")
+        logger.warning(f"File {orig_ofile} already exists!\r")
+    logger.info(f"Responses will be saved to: {output_file_path}")
+    logger.info(f"Errors will be logged to: {log_file_path}")
 
     # Using line buffering
     with open(output_file_path, "w", buffering=1, encoding="utf-8") as res_f:
@@ -237,6 +243,7 @@ def auto_reply_gen(result_gen, reply):
 def batch_automatic_chat_reply(ollama_client, prompts, reply, output_file_path=None):
     def payload_gen(prompts):
         for p in prompts:
+            logger.debug(f"The prompt is:\n{p['prompt']}")
             yield {
                 "qid": p["qid"],
                 "payload": {
@@ -387,7 +394,7 @@ class GeneratedGraphFormatter(ResponseFormatter):
         )
         # remove img encoding from the chat_history
         if "images" in chat_history[0]:
-            logging.info("Removing image entry")
+            logger.info("Removing image entry")
             del chat_history[0]["images"]
 
         stsg = response_data["stsg"]
@@ -473,8 +480,8 @@ class StreamSaver:
 
         error_file = os.path.join(output_dir, f"errors_{start_timestamp}.txt")
 
-        logging.info(f"Responses will be saved to: {output_file_path}")
-        logging.info(f"Errors will be logged to: {error_file}")
+        logger.info(f"Responses will be saved to: {output_file_path}")
+        logger.info(f"Errors will be logged to: {error_file}")
 
         self.response_generator = response_generator
         self.response_formatter = response_formatter

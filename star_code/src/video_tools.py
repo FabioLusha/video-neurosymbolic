@@ -8,21 +8,27 @@ import tempfile
 from pathlib import Path
 
 # star_code
-BASE_DIR = Path.cwd().parent / "logs"
+BASE_DIR = Path(__file__).parent.parent / "logs"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.NOTSET)
+logger.setLevel(logging.DEBUG)
 
 # create console handler
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ch_fmt = logging.Formatter("%(asctime)s - %(name)s - [%(levelname)s] :- %(message)s")
+ch.setLevel(logging.NOTSET) # delegate filtering to logger
+ch_fmt = logging.Formatter(
+    "=[%(levelname)s] :- %(message)s"
+)
 ch.setFormatter(ch_fmt)
 
 fh = logging.FileHandler(str(BASE_DIR / "star_code.log"))
 fh.setLevel(logging.WARNING)
-fh.setFormatter(ch_fmt)
+fh_fmt = logging.Formatter(
+    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+fh.setFormatter(fh_fmt)
 
 logger.addHandler(ch)
 logger.addHandler(fh)

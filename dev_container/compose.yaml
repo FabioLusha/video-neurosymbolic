@@ -27,5 +27,5 @@ services:
           devices:
             - driver: nvidia
               capabilities: [gpu]
-              device_ids: ['1']
-    cpuset: "0-7"
+              device_ids: ['3']
+    cpuset: "16-19"

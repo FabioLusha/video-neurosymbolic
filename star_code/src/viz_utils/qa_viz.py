@@ -2,6 +2,16 @@ import requests
 import webbrowser
 import os
 
+def compute_answer_freq(answers):
+    """
+        answers: pandas.Series
+    """
+    freq = answers.copy().value_counts().reset_index()
+    freq.columns = ["word", "freq"]
+
+    return freq
+
+
 def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
 
     if predictor_labels:

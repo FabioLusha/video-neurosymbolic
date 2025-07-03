@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 
 # relative imports work only with the 'from' form of the import
 from . import batch_processor, frames_tools, video_tools
@@ -7,6 +8,31 @@ from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
                      DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.NOTSET) # delegate filtering to logger
+ch_fmt = logging.Formatter(
+    "=[%(levelname)s] :- %(message)s"
+)
+ch.setFormatter(ch_fmt)
+
+fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
+fh.setLevel(logging.WARNING)
+fh_fmt = logging.Formatter(
+    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+fh.setFormatter(fh_fmt)
+
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 
 def main():
@@ -191,13 +217,13 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
 
     ids = None
     if ids_filepath:
-        print(f"=== Loading file with ids: {ids_filepath}")
+        logger.info(f"=== Loading file with ids: {ids_filepath}")
         with open(ids_filepath, "r") as f:
             ids = [line.strip() for line in f.readlines()]
     else:
-        print("=== No ids file chosen")
+        logger.warning("=== No ids file chosen")
 
-    print(f"=== Generating prompts from: {input_filepath}")
+    logger.info(f"=== Generating prompts from: {input_filepath}")
 
     # When using a LLMasJudge Dataset even if prompt_formatter is not suitable
     # for a STAR or CVRR dataset it is safe to intilize it with the llm-as-judge
@@ -218,7 +244,7 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
         raise ValueError(f"Unknown dataset type: {args.dataset_type}")
 
     if args.task == "llm-judge":
-        print("=== Loading judge type dataset")
+        logger.info("=== Loading judge type dataset")
         dataset = JudgeDataset(dataset, args.responses_file, prompt_formatter)
 
     return dataset
@@ -227,12 +253,12 @@ def initialize_dataset(args, input_filepath, prompt_formatter, ids_filepath):
 def process_prompts(ollama_client, dataset, mode, args, output_filepath):
     """Process prompts based on the selected mode."""
     if mode == "generate":
-        print("=== Mode: generate")
+        logger.info("=== Mode: generate")
         batch_processor.batch_generate(
             ollama_client, dataset, output_file_path=output_filepath
         )
     elif mode == "chat":
-        print("=== Mode: chat")
+        logger.info("=== Mode: chat")
         if not args.reply_file:
             raise ValueError(
                 "Chat mode requires a reply prompt file. Please provide one using the --reply-file parameter."
@@ -248,7 +274,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                             "When using VQA task frames mode you need to provide file with keyframes data"
                         )
 
-                    print(f"=== Loading file with videos metadata: {args.keyframes_info}")
+                    logger.info(f"=== Loading file with videos metadata: {args.keyframes_info}")
                     # remove duplicates and keeps only relevant metadata
                     video_keyframes_info = frames_tools.extract_video_keyframes_info(
                         args.keyframes_info
@@ -284,7 +310,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                 ollama_client, dataset, reply, output_file_path=output_filepath
             )
     else:
-        print("Error: You must select one of the available modes: 'generate' or 'chat'")
+        logger.info("Error: You must select one of the available modes: 'generate' or 'chat'")
         return
 
 
@@ -309,7 +335,7 @@ def stream_vqa(
             )
 
             if not keyframes:
-                print(
+                logger.warning(
                     f"Warning! Couldn't extract frames for question <{question_id}>. Skipping..."
                 )
             encodings = [frame["encoding"] for frame in keyframes]
@@ -371,7 +397,7 @@ def stream_vqa_video(
             )
 
             if not keyframes:
-                print(
+                logger.warning(
                     f"Warning! Couldn't extract frames for question <{question_id}>. Skipping..."
                 )
                 continue

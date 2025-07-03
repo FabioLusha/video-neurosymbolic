@@ -1,0 +1,33 @@
+Now organize the objects and relationships you identified before into a formal scene graph using this format:
+object1, relationship, object2
+
+The list of relationship predicates should be introduced for each frame should be introduce by the frame ID or 
+name and finally by the tag <scene_graph> and terminated by the tag </scene_graph>.
+
+For example:
+Frame 0:
+<scene_graph>
+man, sitting_on, chair
+dog, lying_under, table
+book, on_top_of, shelf
+...
+</scene_graph>
+
+Frame 2:
+<scene_graph>
+woman, on_the_left_of, man
+...
+<scene_graph>
+...
+
+
+Please follow these guidelines:
+1. Create an adequate number of relationship triplets (more if the image is complex)
+2. Use specific and consistent object labels
+3. Use concise but descriptive relationship terms (connect words with underscores)
+4. Include all meaningful relationships between objects
+5. Verify that all objects you identified in step 1 appear in at least one relationship
+6. You can condense multiple visual frames and their descriptions into a single or few frames 
+   if they contains the same or similar repetitive relationships. In doing so be careful to preserve
+   the temporal end spatial relationship and the events unfolding in the video.
+Your scene graph:

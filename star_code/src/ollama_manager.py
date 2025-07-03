@@ -2,15 +2,45 @@ import json
 import logging
 import os
 from collections import namedtuple
+from pathlib import Path
 
 import requests
 
 Result = namedtuple("Result", ["status", "client", "id", "payload", "response"])
 
+# Base directary is parent of current file's directory - star_code
+BASE_DIR = Path(__file__).parent.parent
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.NOTSET) # delegate filtering to logger
+ch_fmt = logging.Formatter(
+    "=[%(levelname)s] :- %(message)s"
+)
+ch.setFormatter(ch_fmt)
+
+fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
+fh.setLevel(logging.WARNING)
+fh_fmt = logging.Formatter(
+    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+fh.setFormatter(fh_fmt)
+
+logger.addHandler(ch)
+logger.addHandler(fh)
+
+
 
 class OllamaRequestManager:
 
-    def __init__(self, base_url, ollama_params, verbosity=None):
+    def __init__(self, base_url, ollama_params):
         self.base_url = base_url
         self.model = ollama_params["model"]
 
@@ -21,32 +51,9 @@ class OllamaRequestManager:
         self.default_handlers["generate"] = OllamaGenerateHandler()
         self.default_handlers["chat"] = OllamaChatHandler()
 
-        # TODO: implement logging functionality
-        self.verbosity = verbosity or int(os.getenv("DEBUG_LEVEL", 0))
-        logger = self._setup_logger()
-
-    def _setup_logger(self):
-        # TODO:
-        # map verbosity to logging levels?
-
-        class ScaffoldLogger:
-            def log(self, message):
-                print(message)
-                logger = logging.getLogger(self.__class__.__name__)
-
-            def info(self, msg):
-                self.log(msg)
-
-            def debug(self, msg):
-                self.log(msg)
-
-            def warning(self, msg):
-                self.log(msg)
-
-        return ScaffoldLogger()
 
     def load_model(self):
-        print(f" Loading model {self.ollama_params['model']} ".center(80, "="))
+        logger.info(f" Loading model {self.ollama_params['model']} ".center(40, "="))
         # An empty prompt will cause ollama to load the specified model
         try:
             requests.post(
@@ -56,7 +63,7 @@ class OllamaRequestManager:
         except requests.ConnectionError as e:
             raise requests.ConnectionError("Error while connecting to ollama") from e
         except requests.RequestException as e:
-            raise requests.RequestExcetpion("Error while connecting to ollama") from e
+            raise requests.RequestException("Error while connecting to ollama") from e
 
     def unload_model(self):
         requests.post(
@@ -128,10 +135,12 @@ class OllamaStreamHandler:
         return {"token_stream": []}
 
     def process_chunk(self, data, result):
-        pass  # Implemented by subclasses
+        token = data.get("response", "")
+        result["token_stream"].append(token)
+        return result
 
     def finalize_result(self, result):
-        return "".join(result["token_stream"])
+        return {"content": "".join(result["token_stream"]), "role": result["role"]}
 
 
 class OllamaGenerateHandler(OllamaStreamHandler):
