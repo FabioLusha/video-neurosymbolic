@@ -3,7 +3,9 @@ object1, relationship, object2
 
 The spatio-temporal scene graph should be enclosed between the tags <stsg> and </stsg>.
 The list of relationship predicates pertaining a frame should be introduced by the frame ID or name and enclosed in the tags <scene_graph> and </scene_graph>:
-For example: 
+
+
+For example:
 
 <stsg>
 Frame 0:
