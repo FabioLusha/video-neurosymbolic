@@ -1,9 +1,12 @@
 import argparse
 import json
 import logging
+from pathlib import Path
 
 # relative imports work only with the 'from' form of the import
-from . import batch_processor, frames_tools, video_tools
+from . import batch_processor, frames_tools
+from . import prompt_formatters as pf
+from . import video_tools
 from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
                      DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
@@ -434,6 +437,122 @@ def stream_vqa_video(
 
     pipeline.consume(dataset)
     return
+
+
+def img_payload(
+    ollama_params,
+    sample,
+    raw_videos_dir,
+    fps,
+    max_frames=None,
+    batch_images=False
+):
+    video_id = sample["video_id"]
+    start = sample.get("start", None)
+    end = sample.get("end", None)
+
+    frames = video_tools.generate_video_frames(
+        Path(raw_videos_dir, f"{video_id}.mp4"),
+        fps=fps,
+        start=start,
+        end=end,
+        max_frames=max_frames
+    )
+
+    if not frames:
+        logger.warning(f"Warning: Couldn't extract frames from video {video_id}. Skipping")
+        return None
+
+    logger.info(f"\nVideo: {video_id}")
+    logger.info(f" - interval: {start}-{end}")
+    logger.info(f" - {len(frames)} frames.")
+
+    payloads = []
+    if batch_images:
+        # add img tags delimited by text to help the VLM separate frames
+        img_pformatter = pf.ImgPromptDecorator(
+            pf.PromptFormatter(sample["prompt"]),
+            img_field="images", # expecting a format string with {images}
+            tag="[img]" # using ollama images tag
+        )
+
+        usr_promtp_wtags = img_pformatter.format({"images": frames})
+        req_obj = {
+            # qid for backward compatibility
+            "qid": video_id,
+            "start": start,
+            "end": end,
+            "payload": {
+                **ollama_params,
+                "messages": [{
+                    "role": "user",
+                    "content": usr_promtp_wtags,
+                    "images": [f["encoding"] for f in frames],
+                }],
+            },
+        }
+        payloads = [req_obj]
+    else:
+        for frame in frames:
+            req_obj = {
+                # qid for backward compatibility
+                "qid": video_id,
+                "start": start,
+                "end": end,
+                "frame_id": frame["frame_id"],
+                "payload": {
+                    **ollama_params,
+                    "messages": [{
+                        "role": "user",
+                        "content": sample["prompt"],
+                        "images": [frame["encoding"]],
+                    }],
+                },
+            }
+
+            payloads.append(req_obj)
+
+    return payloads
+
+def stream_sgg(
+    ollama_client,
+    dataset,
+    reply,
+    videos_dir,
+    fps,
+    output_filepath,
+    max_frames=None,
+    batch_images=False
+):
+
+    def _payload_gen(dataset):
+        for i in dataset:
+            payloads = img_payload(
+                ollama_params=ollama_client.params,
+                sample=i,
+                raw_videos_dir=videos_dir,
+                fps=fps,
+                max_frames=max_frames,
+                batch_images=batch_images
+
+            )
+            if payloads:
+                yield from payloads
+
+    bp = batch_processor
+    pipeline = bp.Pipeline(
+        # the first generator converts the prompt to the right format
+        lambda dataset_gen: _payload_gen(dataset_gen),
+        lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
+        lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
+        lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),
+        lambda resp_stream: bp.stream_save(
+            resp_stream, bp.ChatResponseFormatter(), output_filepath
+        ),
+    )
+
+    pipeline.consume(dataset)
+
 
 
 if __name__ == "__main__":
