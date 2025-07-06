@@ -32,7 +32,7 @@ ch.setFormatter(ch_fmt)
 fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
 fh.setLevel(logging.WARNING)
 fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    "%(asctime)s [%(levelname)s] - %(name)s :- %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 fh.setFormatter(fh_fmt)
@@ -393,7 +393,16 @@ def streaming_frame_generation(
         ),
         lambda stream: bp.auto_reply_gen(stream, reply),
         # check the response is ok before passing to frame_extraction,
-        lambda stream: (o for o in stream if o["status"] == "ok"),
+        lambda stream: (o for o in stream \
+            if o["status"] == "ok" \
+                # A trick to log the error and skip the object.
+                # if the status is not ok, we will log the error,
+                # logging returns None, therefore the condition will always be False
+                or logger.error(
+                    f"VLM failed to generate a proper output for {o.get('video_id', o.get('qid', 'unknown'))}:"
+                    f"{o.get('error', 'No error info')}"
+                )
+        ),
         _stream_batch_condition,
         lambda stream: bp.stream_save(
             stream,
