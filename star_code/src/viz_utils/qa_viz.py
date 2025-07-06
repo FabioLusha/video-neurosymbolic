@@ -1,6 +1,16 @@
 import requests
 import webbrowser
 import os
+from pathlib import Path
+
+import base64
+import io
+from PIL import Image
+import matplotlib.pyplot as plt
+
+
+
+from src import video_tools
 
 def compute_answer_freq(answers):
     """
@@ -53,6 +63,7 @@ def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
     print("│")
     print("└" + "─" * 85)
 
+
 def upload_and_visualize_video(videopath, server_url="http://localhost:10882"):
     """
     Uploads a video to the Django server and opens the browser to visualize it.
@@ -72,3 +83,31 @@ def upload_and_visualize_video(videopath, server_url="http://localhost:10882"):
         else:
             print(f"Failed to upload video. Status code: {response.status_code}")
             print(response.text)
+
+
+def vis_video_frames(data, raw_video_dir, save_video_dir, fps=1):
+
+    start = round(data['start'], 2) # start time
+    end = round(data['end'], 2) # end time
+    video_id = data['video_id']
+
+    in_path = raw_video_dir / f"{video_id}.mp4"
+    out_path = save_video_dir / f"{data['question_id']}.mp4"
+
+    print('\tVideo Seg: ', str(start) + 's', '-', str(end) + 's')
+    frames = video_tools.generate_video_frames(in_path, fps, start, end)
+    if not frames:
+        print("No frames to display.")
+        return
+
+    num_frames = len(frames)
+    fig, axes = plt.subplots(1, num_frames, figsize=(num_frames * 3, 3))
+    for frame_data, ax in zip(frames, axes):
+        img_data = base64.b64decode(frame_data["encoding"])
+        img = Image.open(io.BytesIO(img_data))
+        ax.imshow(img)
+        ax.axis("off")
+        ax.set_title(f"Frame {frame_data['frame_id']}")
+
+    plt.tight_layout()
+    plt.show()
