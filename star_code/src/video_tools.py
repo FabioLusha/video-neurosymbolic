@@ -15,23 +15,23 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.NOTSET) # delegate filtering to logger
+console_handler_fmt = logging.Formatter(
     "=[%(levelname)s] :- %(message)s"
 )
-ch.setFormatter(ch_fmt)
+console_handler.setFormatter(console_handler_fmt)
 
-fh = logging.FileHandler(str(BASE_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+file_handler = logging.FileHandler(str(BASE_DIR / "star_code.log"))
+file_handler.setLevel(logging.WARNING)
+file_handler_fmt = logging.Formatter(
+    "=%(asctime)s [%(levelname)s] - %(name)s :- %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
-fh.setFormatter(fh_fmt)
+file_handler.setFormatter(file_handler_fmt)
 
-logger.addHandler(ch)
-logger.addHandler(fh)
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 def get_video_stream_info(video_path):
     """Get the details of the video streams."""
@@ -96,12 +96,13 @@ def extract_frames(
 
     cmd += ["-i", video_path]
     # Limit duration if end_time is set
-    if end_time:
-        if end_time > duration:
-            end_time = duration
-        cmd += ["-t", str(end_time - start_time)]
+    end_time = end_time or duration
+    if end_time > duration:
+        end_time = duration
 
-    if start_time > duration or (end_time and start_time > end_time): 
+    cmd += ["-t", str(end_time - start_time)]
+
+    if start_time > duration or start_time > end_time:
         raise ValueError(
             "The provided 'start_time' exceeds the end_time or duration of the video-clip"
             f"---- start_time:     {start_time}"
@@ -137,6 +138,7 @@ def generate_video_frames(
     temp_dir = None
     try:
         # Extract frames from video within specified time range
+        logger.info(f"Extracting frames from {video_path} with start: {start}, end: {end}, fps: {fps}, max_frames: {max_frames}")
         temp_dir, frame_paths = extract_frames(
             video_path,
             fps,
@@ -173,7 +175,7 @@ def generate_video_frames(
             logger.warning("Warning: No valid frames were extracted for the video")
             return None
     except Exception as e:
-        logger.error(f"Error processing video: {str(e)}")
+        logger.error(f"Error processing video {video_path}: {str(e)}")
         return None
     finally:
         # Clean up temporary files
@@ -207,7 +209,9 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
     for video_metadata in video_info:
         video_id   = video_metadata["video_id"]
         start_time = video_metadata.get("start", None)
+        start_time = float(start_time) if start_time else None
         end_time   = video_metadata.get("end", None)
+        end_time   = float(end_time) if end_time else None
 
         video_path = video_dir / f"{video_id}.mp4"
         if not video_path.exists():
