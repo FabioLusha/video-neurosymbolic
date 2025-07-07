@@ -1,9 +1,7 @@
 import json
 import os
-from torch.utils.data import Dataset
 
-
-class PromptDataset(Dataset):
+class PromptDataset:
     def __init__(
         self,
         qa_file_path,
