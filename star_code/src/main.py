@@ -306,7 +306,12 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                     )
             else:
                 raise NotImplementedError("The VQA works only for the STAR dataset")
-
+        elif args.task == "sgg":
+            print(
+                "If you want the SGG task look at the graph_gen.py module.\n"
+                "Otherwise if you were looking for the sgg with question prompt bias "
+                "look at the script notebooks/0707_sgg_qbias_script.py"
+            )
         else:
             reply = _load_prompt_fromfile(args.reply_file)
             batch_processor.batch_automatic_chat_reply(
@@ -375,6 +380,7 @@ def stream_vqa(
     return
 
 
+
 def stream_vqa_video(
     ollama_client,
     dataset,
@@ -428,8 +434,27 @@ def stream_vqa_video(
         # the first generator converts the prompt to the right format
         lambda dataset_gen: _payload_gen(dataset_gen),
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
-        lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
+        lambda resp_stream: (o for o in resp_stream \
+            if o["status"] == "ok" \
+                # A trick to log the error and skip the object.
+                # if the status is not ok, we will log the error,
+                # logging returns None, therefore the condition will always be False
+                or logger.error(
+                    f"VLM failed to generate a proper output for {o.get('qid', 'unknown')}:"
+                    f"{o.get('error', 'No error info')}"
+                )
+        ),
         lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),
+        lambda resp_stream: (o for o in resp_stream \
+            if o["status"] == "ok" \
+                # A trick to log the error and skip the object.
+                # if the status is not ok, we will log the error,
+                # logging returns None, therefore the condition will always be False
+                or logger.error(
+                    f"LLM failed to generate a proper response to the auto_reply {o.get('qid', 'unknown')}:"
+                    f"{o.get('error', 'No error info')}"
+                )
+        ),
         lambda resp_stream: bp.stream_save(
             resp_stream, bp.ChatResponseFormatter(), output_filepath
         ),
@@ -447,6 +472,7 @@ def img_payload(
     max_frames=None,
     batch_images=False
 ):
+    qid = sample["question_id"]
     video_id = sample["video_id"]
     start = sample.get("start", None)
     end = sample.get("end", None)
@@ -471,12 +497,14 @@ def img_payload(
     if batch_images:
         # add img tags delimited by text to help the VLM separate frames
         img_pformatter = pf.ImgPromptDecorator(
-            pf.PromptFormatter(sample["prompt"]),
+            # manually adding the images tag
+            pf.PromptFormatter(f"{sample['prompt']}\n{{images}}"),
             img_field="images", # expecting a format string with {images}
             tag="[img]" # using ollama images tag
         )
 
-        usr_promtp_wtags = img_pformatter.format({"images": frames})
+        usr_prompt_wtags = img_pformatter.format({"images": frames})
+        logger.debug(f"The prompt is:\n{usr_prompt_wtags}")
         req_obj = {
             # qid for backward compatibility
             "qid": video_id,
@@ -486,7 +514,7 @@ def img_payload(
                 **ollama_params,
                 "messages": [{
                     "role": "user",
-                    "content": usr_promtp_wtags,
+                    "content": usr_prompt_wtags,
                     "images": [f["encoding"] for f in frames],
                 }],
             },
@@ -528,13 +556,12 @@ def stream_sgg(
     def _payload_gen(dataset):
         for i in dataset:
             payloads = img_payload(
-                ollama_params=ollama_client.params,
+                ollama_params=ollama_client.ollama_params,
                 sample=i,
                 raw_videos_dir=videos_dir,
                 fps=fps,
                 max_frames=max_frames,
                 batch_images=batch_images
-
             )
             if payloads:
                 yield from payloads
@@ -544,8 +571,27 @@ def stream_sgg(
         # the first generator converts the prompt to the right format
         lambda dataset_gen: _payload_gen(dataset_gen),
         lambda payload_gen: bp.stream_request(payload_gen, ollama_client, "chat"),
-        lambda resp_stream: (o for o in resp_stream if o["status"] == "ok"),
+        lambda stream: (o for o in stream \
+            if o["status"] == "ok" \
+                # A trick to log the error and skip the object.
+                # if the status is not ok, we will log the error,
+                # logging returns None, therefore the condition will always be False
+                or logger.error(
+                    f"VLM failed to generate a proper output for {o.get('qid', 'unknown')}:"
+                    f"{o.get('error', 'No error info')}"
+                )
+        ),
         lambda resp_stream: bp.auto_reply_gen(resp_stream, reply),
+        lambda resp_stream: (o for o in resp_stream \
+            if o["status"] == "ok" \
+                # A trick to log the error and skip the object.
+                # if the status is not ok, we will log the error,
+                # logging returns None, therefore the condition will always be False
+                or logger.error(
+                    f"LLM failed to generate a proper response to the auto_reply {o.get('qid', 'unknown')}:"
+                    f"{o.get('error', 'No error info')}"
+                )
+        ),
         lambda resp_stream: bp.stream_save(
             resp_stream, bp.ChatResponseFormatter(), output_filepath
         ),
