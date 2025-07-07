@@ -140,7 +140,7 @@ class OllamaStreamHandler:
         return result
 
     def finalize_result(self, result):
-        return {"content": "".join(result["token_stream"]), "role": result["role"]}
+        return {"content": "".join(result["token_stream"]), "role": "assistant"}
 
 
 class OllamaGenerateHandler(OllamaStreamHandler):
