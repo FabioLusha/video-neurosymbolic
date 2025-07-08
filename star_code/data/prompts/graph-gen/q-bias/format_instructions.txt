@@ -30,3 +30,5 @@ Please follow these guidelines:
 4. Include all meaningful relationships between objects
 5. Verify that all objects you identified in step 1 appear in at least one relationship
 6. If multiple visual frames contain similar relationships, you can condense them into a single or few scene graphs. Be careful to preserve the temporal and spatial relationships of the events unfolding in the video.
+
+Your spatio-temporal scene graph:
