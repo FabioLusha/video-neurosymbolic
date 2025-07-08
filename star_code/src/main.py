@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 # relative imports work only with the 'from' form of the import
-from . import batch_processor, frames_tools
+from . import batch_processor, frames_tools, graph_gen
 from . import prompt_formatters as pf
 from . import video_tools
 from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
@@ -507,9 +507,8 @@ def img_payload(
         logger.debug(f"The prompt is:\n{usr_prompt_wtags}")
         req_obj = {
             # qid for backward compatibility
-            "qid": video_id,
-            "start": start,
-            "end": end,
+            "qid": qid,
+            "question_id": qid,
             "payload": {
                 **ollama_params,
                 "messages": [{
@@ -524,9 +523,8 @@ def img_payload(
         for frame in frames:
             req_obj = {
                 # qid for backward compatibility
-                "qid": video_id,
-                "start": start,
-                "end": end,
+                "qid": qid,
+                "question_id": qid,
                 "frame_id": frame["frame_id"],
                 "payload": {
                     **ollama_params,
@@ -566,6 +564,22 @@ def stream_sgg(
             if payloads:
                 yield from payloads
 
+    # Helper function for the pipeline to distiniguish what do if batch_images is set
+    def _stream_batch_condition(stream):
+        for obj in stream:
+            content = obj["response"]["content"]
+            if batch_images:
+                # Introduce spurious modifier to satisfy GeneratedGraphFormatter interface
+                yield {**obj, "stsg": content}
+            else:
+                # Map each object to include 'sg', then aggregate the mapped stream
+                mapped = (
+                    {**obj, "sg": graph_gen.extract_frame_description(obj["response"]["content"])}
+                    for obj in stream
+                )
+                # now let the aggregator generate the stream
+                yield from graph_gen.frame_aggregator(mapped)
+
     bp = batch_processor
     pipeline = bp.Pipeline(
         # the first generator converts the prompt to the right format
@@ -592,8 +606,9 @@ def stream_sgg(
                     f"{o.get('error', 'No error info')}"
                 )
         ),
+        _stream_batch_condition,
         lambda resp_stream: bp.stream_save(
-            resp_stream, bp.ChatResponseFormatter(), output_filepath
+            resp_stream, bp.GeneratedGraphFormatter(), output_filepath
         ),
     )
 

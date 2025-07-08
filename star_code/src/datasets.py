@@ -1,5 +1,33 @@
 import json
+import logging
 import os
+
+from ._const import BASE_DIR
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.NOTSET) # delegate filtering to logger
+ch_fmt = logging.Formatter(
+    "=[%(levelname)s] :- %(message)s"
+)
+ch.setFormatter(ch_fmt)
+
+fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
+fh.setLevel(logging.WARNING)
+fh_fmt = logging.Formatter(
+    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+fh.setFormatter(fh_fmt)
+
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 class PromptDataset:
     def __init__(
@@ -67,6 +95,7 @@ class PromptDataset:
         # STSG stats
         if self.stsg_file_path:
             print(f"\nSTSG File: {os.path.basename(self.stsg_file_path)}")
+            print(f"STSK key: {self.stsg_id_key}")
             print(f"Number of unique video IDs with STSG: {len(self.stsgs)}")
 
             if len(self.stsgs) > 0:
@@ -193,30 +222,31 @@ class STARDataset(PromptDataset):
 
     def preprocess(self):
         """If a stsg file is specified, than filter out the qa without an stsg"""
-        
+
         if not self.stsg_file_path:
             return
-        
+
         if self.stsg_id_key == "question_id":
             filtered_qas = []
             for sample in self.qa:
-                stsg = self.stsgs.get(sample.get("question_id"), None)
+                question_id = sample["question_id"]
+                stsg = self.stsgs.get(question_id, None)
                 if not stsg:
-                    # TODO: warn qa is not associated to a stsg
+                    logger.warn(f"{question_id:<20}: STSG not found or null-string.")
                     continue
-                
+
                 sample['stsg'] = stsg
                 filtered_qas.append(sample)
-                
+
             self.qa = filtered_qas
-            
+
         elif self.stsg_id_key == "video_id":
             filtered_qas = []
             for sample in self.qa:
                 video_id = sample.get("video_id")
                 start = sample.get("start")
                 end = sample.get("end")
-                
+
                 if video_id in self.stsgs:
                     # Look inside all the sub-clip of the video for the one referenced
                     # by the question (i.e. matching video_id, start, and end)

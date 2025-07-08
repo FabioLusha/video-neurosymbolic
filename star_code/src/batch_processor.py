@@ -408,6 +408,10 @@ class GeneratedGraphFormatter(ResponseFormatter):
             "stsg": stsg,
         }
 
+        question_id = response_data.get("question_id", None)
+        if question_id:
+            success_response = {"question_id": question_id, **success_response}
+
         return success_response
 
     def format_error_response(self, response_data):
