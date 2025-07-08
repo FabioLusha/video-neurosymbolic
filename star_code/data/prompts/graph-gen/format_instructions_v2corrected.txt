@@ -1,5 +1,5 @@
 Now organize the objects and relationships you identified before into a formal spatio-temporal scene graph using this format for the predicates: 
-object1, relationship, object2
+object1 ---- relationship ---- object2
 
 The spatio-temporal scene graph should be enclosed between the tags <stsg> and </stsg>.
 The list of relationship predicates pertaining a frame should be introduced by the frame ID or name and enclosed in the tags <scene_graph> and </scene_graph>:
