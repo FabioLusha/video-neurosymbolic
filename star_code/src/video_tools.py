@@ -16,22 +16,20 @@ logger.setLevel(logging.DEBUG)
 
 # create console handler
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.NOTSET) # delegate filtering to logger
-console_handler_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
+console_handler.setLevel(logging.NOTSET)  # delegate filtering to logger
+console_handler_fmt = logging.Formatter("=[%(levelname)s] :- %(message)s")
 console_handler.setFormatter(console_handler_fmt)
 
 file_handler = logging.FileHandler(str(BASE_DIR / "star_code.log"))
 file_handler.setLevel(logging.WARNING)
 file_handler_fmt = logging.Formatter(
-    "=%(asctime)s [%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    "%(asctime)s [%(levelname)s] - %(name)s :- %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
 file_handler.setFormatter(file_handler_fmt)
 
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
 
 def get_video_stream_info(video_path):
     """Get the details of the video streams."""
@@ -124,21 +122,18 @@ def extract_frames(
     cmd.append(out_pattern)
     subprocess.run(cmd, check=True)
 
-    frame_paths = list(Path(temp_dir).glob("frame_*.png"))
+    frame_paths = sorted(list(Path(temp_dir).glob("frame_*.png")))
 
     return temp_dir, frame_paths
 
-def generate_video_frames(
-        video_path,
-        fps=1,
-        start=None,
-        end=None,
-        max_frames=None
-):
+
+def generate_video_frames(video_path, fps=1, start=None, end=None, max_frames=None):
     temp_dir = None
     try:
         # Extract frames from video within specified time range
-        logger.info(f"Extracting frames from {video_path} with start: {start}, end: {end}, fps: {fps}, max_frames: {max_frames}")
+        logger.info(
+            f"Extracting frames from {video_path} with start: {start}, end: {end}, fps: {fps}, max_frames: {max_frames}"
+        )
         temp_dir, frame_paths = extract_frames(
             video_path,
             fps,
@@ -158,10 +153,11 @@ def generate_video_frames(
 
             try:
                 with open(frame_path, "rb") as f:
+                    logger.debug(f"Encoding frame {frame_path.stem}")
                     img_bytes = f.read()
                     b64_encodings.append(
                         {
-                            "frame_id": i,
+                            "frame_id": {frame_path.stem},
                             "encoding": base64.b64encode(img_bytes).decode("utf-8"),
                         }
                     )
@@ -184,8 +180,9 @@ def generate_video_frames(
                 if temp_dir:
                     shutil.rmtree(temp_dir)
             except Exception as e:
-                logger.warning(f"Warning: Error cleaning up temporary directory: {str(e)}")
-
+                logger.warning(
+                    f"Warning: Error cleaning up temporary directory: {str(e)}"
+                )
 
 
 def generate_frames(video_dir, fps, video_info=None, output_dir=None):
@@ -207,11 +204,11 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
         video_info = [{"video_id": v.stem} for v in video_files]
 
     for video_metadata in video_info:
-        video_id   = video_metadata["video_id"]
+        video_id = video_metadata["video_id"]
         start_time = video_metadata.get("start", None)
         start_time = float(start_time) if start_time else None
-        end_time   = video_metadata.get("end", None)
-        end_time   = float(end_time) if end_time else None
+        end_time = video_metadata.get("end", None)
+        end_time = float(end_time) if end_time else None
 
         video_path = video_dir / f"{video_id}.mp4"
         if not video_path.exists():
@@ -219,7 +216,9 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
             continue
 
         try:
-            video_frames_dir = Path(output_dir, f"{video_id}.mp4") if output_dir else None
+            video_frames_dir = (
+                Path(output_dir, f"{video_id}.mp4") if output_dir else None
+            )
             # Extract frames from video within specified time range
             temp_dir, frame_paths = extract_frames(
                 video_path,
@@ -239,11 +238,12 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                     continue
 
                 try:
+                    logger.debug(f"Encoding frame {frame_path.stem}")
                     with open(frame_path, "rb") as f:
                         img_bytes = f.read()
                         b64_encodings.append(
                             {
-                                "frame_id": i,
+                                "frame_id": {frame_path.stem},
                                 "encoding": base64.b64encode(img_bytes).decode("utf-8"),
                             }
                         )
@@ -255,7 +255,9 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
             if b64_encodings:
                 yield {**video_metadata, "frames": b64_encodings}
             else:
-                logger.warning(f"Warning: No valid frames were extracted for video {video_id}")
+                logger.warning(
+                    f"Warning: No valid frames were extracted for video {video_id}"
+                )
 
         except Exception as e:
             logger.error(f"Error processing video {video_id}: {str(e)}")
@@ -266,4 +268,6 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
-                    logger.warning(f"Warning: Error cleaning up temporary directory: {str(e)}")
+                    logger.warning(
+                        f"Warning: Error cleaning up temporary directory: {str(e)}"
+                    )
