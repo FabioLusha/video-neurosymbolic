@@ -1,5 +1,22 @@
+import sys
 import json
 import os
+from pathlib import Path
+
+
+STAR_CODE_PATH = str(Path.cwd().parent.parent)
+print(STAR_CODE_PATH)
+sys.path.append(STAR_CODE_PATH)
+
+from src import (
+    main,
+    datasets,
+    video_tools,
+    ollama_manager,
+    prompt_formatters as pf,
+    _const,
+)
+
 from os.path import exists
 import random
 import torch
@@ -10,10 +27,8 @@ from PIL import Image
 from transformers import AutoTokenizer
 from tqdm import tqdm
 from decord import VideoReader, cpu
-import sys
 
 
-from pathlib import Path
 sys.path.append(str(Path.cwd()))
 
 #sys.path.append('/home/jupyter/democ_egodatasets/')
@@ -23,6 +38,8 @@ from video_chatgpt.eval.model_utils import initialize_model
 from huggingface_hub import hf_hub_download
 from transformers.utils import logging
 logging.set_verbosity_error()
+
+
 
 
 
@@ -122,15 +139,24 @@ def get_spatio_temporal_features_torch(features):
     concat_tokens = torch.cat([temporal_tokens, spatial_tokens], dim=0).half()
     return concat_tokens
 
-def video_chatgpt_infer(frames, question, model, vision_tower, tokenizer, image_processor, video_token_len, conv_mode="video-chatgpt_v1"):
+def video_chatgpt_infer(
+    frames,
+    question,
+    model,
+    vision_tower,
+    tokenizer,
+    image_processor,
+    video_token_len,
+    conv_mode="video-chatgpt_v1"
+):
     DEFAULT_VIDEO_PATCH_TOKEN = "<vid_patch>"
     DEFAULT_VID_START_TOKEN = "<vid_start>"
     DEFAULT_VID_END_TOKEN = "<vid_end>"
 
     if model.get_model().vision_config.use_vid_start_end:
-        qs = question + '\n' + DEFAULT_VID_START_TOKEN + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len + DEFAULT_VID_END_TOKEN
+        qs = DEFAULT_VID_START_TOKEN + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len + DEFAULT_VID_END_TOKEN + '\n' + question
     else:
-        qs = question + '\n' + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len
+        qs =  DEFAULT_VIDEO_PATCH_TOKEN * video_token_len + '\n' + question
 
     conv = conv_templates[conv_mode].copy()
     conv.append_message(conv.roles[0], qs)
@@ -155,9 +181,12 @@ def video_chatgpt_infer(frames, question, model, vision_tower, tokenizer, image_
             input_ids,
             video_spatio_temporal_features=video_features.unsqueeze(0),
             do_sample=True,
-            temperature=0.2,
-            max_new_tokens=1024,
-            stopping_criteria=[stopping_criteria])
+            temperature=0.9,
+            top_p=0.9,
+            max_new_tokens=2048,
+            eos_token_id=tokenizer.eos_token_id,
+            #stopping_criteria=[stopping_criteria]
+        )
 
     outputs = tokenizer.batch_decode(output_ids[:, input_ids.shape[1]:], skip_special_tokens=True)[0]
     return outputs.strip().rstrip(stop_str).strip()
@@ -165,6 +194,25 @@ def video_chatgpt_infer(frames, question, model, vision_tower, tokenizer, image_
 if __name__ == "__main__":
     # Pulizia iniziale
     cleanup_memory()
+    WORK_DIR = _const.BASE_DIR
+    STAR_SMALL = WORK_DIR / "data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
+    RAW_VIDEO_DIR = WORK_DIR / 'data/datasets/action-genome/Charades_v1_480/'
+    
+    
+    system_prompt = None
+    
+    # Prompt with only questions
+    user_prompt = main._load_prompt_fromfile(WORK_DIR / "data/prompts/vqa/user_prompt_v2.txt")
+    user_pformatter = pf.MCQPromptWoutSTSG(user_prompt)
+    output_filepath = WORK_DIR / "outputs/vqa_videochatgpt2_complex_2stage_prompting.jsonl"
+
+    star_dataset = datasets.STARDataset(
+        STAR_SMALL,
+        user_pformatter,
+    )
+
+    follow_up = main._load_prompt_fromfile(WORK_DIR / "data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt")
+    fps = 1
 
     # ======= CARICAMENTO MODELLO =======
 
@@ -179,53 +227,81 @@ if __name__ == "__main__":
     )
 
     # ======= CARICAMENTO JSON E INFERENZA =======
-    path = "/home/jupyter/democ_egodatasets/"
-    json_path = os.path.join(path, "part_test2.json")
-    frame_folder = os.path.join(path, "Frame_extraction_100")   
-    output_csv = path +"vcg_100_uniform3.csv"
+    # path = "/home/jupyter/democ_egodatasets/"
+    # json_path = os.path.join(path, "part_test2.json")
+    # frame_folder = os.path.join(path, "Frame_extraction_100")   
+    # output_csv = path +"vcg_100_uniform3.csv"
 
     cleanup_memory()
 
 
-    with open(json_path, 'r') as f:
-        samples = json.load(f)
 
-    file_exists = exists(output_csv)
-    fieldnames = ["sample_id", "question", "ground_truth", "generated_answer"]
-
+    samples = [star_dataset[i] for i in range(len(star_dataset))]
     for idx, sample in enumerate(tqdm(samples, desc="Esecuzione inference")):
-        sample_id = sample["sample_id"]
-        question = sample["question"]
+        sample_id = sample["question_id"]
         ground_truth = sample["answer"]
-        frames_path = os.path.join(frame_folder, sample_id)
+
+        prompt = sample["prompt"] #+ "\n" + follow_up
+
+        video_id = sample["video_id"]
+        start_time = sample["start"]
+        end_time = sample["end"]
+        frame_folder, frames_path = video_tools.extract_frames(
+            video_path=str(RAW_VIDEO_DIR / f"{video_id}.mp4"),
+            fps=fps,
+            start_time=start_time,
+            end_time=end_time,
+        )
         
-        if not os.path.exists(frames_path):
-            print(f"⚠️ Video non trovato: {frames_path}")
+        print(prompt)
+        chat_history = [{"role": "user", "content": prompt}]
+        if not os.path.exists(frame_folder):
+            print(f"⚠️ Video non trovato: {frame_folder}")
             generated_answer = "[VIDEO NON TROVATO]"
         else:
             try:
-                frames = load_frames_from_folder(frames_path)
-                generated_answer = video_chatgpt_infer(frames, question, model, vision_tower, tokenizer, image_processor, video_token_len)
+                frames = load_frames_from_folder(frame_folder)
+                generated_answer = video_chatgpt_infer(frames, prompt, model, vision_tower, tokenizer, image_processor, video_token_len)
+                if generated_answer:
+                    prompt = (
+                        '<start_header_id|>user<|end_header_id|>' +
+                        prompt +
+                        '<|eot_id|>' +
+                        '<start_header_id|>assistant<|end_header_id|>' +
+                        generated_answer +
+                        '<|eot_id|>' +
+                        '<start_header_id|>user<|end_header_id|>' +
+                        follow_up
+                    )
+
+                    print(prompt)
+                    chat_history.append({"role": "assitant", "content": generated_answer})
+                    chat_history.append({"role": "user", "content": follow_up})
+
+                    generated_answer = video_chatgpt_infer(frames, prompt, model, vision_tower, tokenizer, image_processor, video_token_len)
+                    print(generated_answer)
+
+                    chat_history.append({"role": "assitant", "content": generated_answer})
             except Exception as e:
                 print(f"❌ Errore su {sample_id}: {e}")
                 generated_answer = "[ERRORE]"
-            
+
+        print(generated_answer)
         row_data = {
-            "sample_id": sample_id,
-            "question": question,
+            "qid": sample_id,
+            "question_id": sample_id,
+            "prompt": prompt,
             "ground_truth": ground_truth,
-            "generated_answer": generated_answer}
+            "generated_answer": generated_answer,
+            "chat_history": chat_history,
+        }
 
         # Scrive ad ogni iterazione
-        with open(output_csv, "a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+        with open(output_filepath, "a", encoding="utf-8") as f:
+            line = json.dumps(row_data) + "\n"
+            f.write(line)
+            f.flush()
 
-            if not file_exists and idx == 0:
-                writer.writeheader()
-                file_exists = True
-
-            writer.writerow(row_data)
-        
         # Cleanup memoria anche dopo scrittura
         cleanup_memory()
-    print(f"\n✅ Risultati salvati in: {output_csv}")
+    print(f"\n✅ Risultati salvati in: {output_filepath}")
