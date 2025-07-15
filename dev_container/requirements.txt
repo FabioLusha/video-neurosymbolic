@@ -1,7 +1,30 @@
+# web
+fastapi
+urllib3
+uvicorn
+nest
+requests
+responses
+
+regex
+gensim
+nltk
+
+# plotting
+matplotlib
+seaborn
+pillow
+wordcloud
+tqdm
+
 # Core Jupyter
 jupyter
 notebook
 jupyterlab
+jupyterlab_widgets
+# Optional Kernels (Uncomment if needed)
+# irkernel>=1.0.0  # For R support
+
 
 # Data Science Essentials
 numpy
@@ -20,39 +43,17 @@ jupyter_contrib_nbextensions
 jupyter_nbextensions_configurator
 ipykernel
 
-# Jupyter Lab Extensions (if using JupyterLab)
-jupyterlab_widgets
-
-# Optional Kernels (Uncomment if needed)
-# irkernel>=1.0.0  # For R support
-jupyter
-
-# plotting
-matplotlib
-seaborn
-
-fastapi
-uvicorn
-nest
-gensim
-
+# PyTorch
+torch
+tiktoken
+blobfile
 
 networkx
 packaging
 graphviz==0.20.3
 
-regex
-requests
-responses
-
 # huggingface
 transformers
 datasets
-
-wordcloud
-urllib3
-tqdm
-tiktoken
 tokenizers
-pillow
-nltk
+tiktoken

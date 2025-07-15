@@ -1,20 +1,31 @@
-FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-devel
+FROM ubuntu:22.04
 
 # ********************************************************
 # * Set your username and group names below *
 # ********************************************************
 
-ARG USERNAME=$USER
-ARG USER_UID=$USER_GID
-ARG USER_GID=$USER_UID
+# Build with:
+# docker build \
+#   --build-arg USERNAME="$USER" \
+#   --build-arg USER_UID="$(id -u)" \
+#   -t myimage:latest .
 
+# 1. Declare build-time args (no defaults here)
+ARG USERNAME
+ARG USER_UID
+ARG USER_GID
+
+# 2. Turn them into runtime ENV if you need them later
+ENV USERNAME=${USERNAME} \
+    USER_UID=${USER_UID} \
+    USER_GID=${USER_UID}
 # ********************************************************
 #
 # ********************************************************
 
 ENV DEBIAN_FRONTEND noninteractive
 # add Nvidea signature keys
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+# RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
 # add repo for opython 3.X
 RUN apt update
 RUN apt install -y software-properties-common
@@ -37,9 +48,9 @@ USER $USERNAME
 WORKDIR /home/$USERNAME
 
 ENV PATH="/home/$USERNAME/.local/bin:${PATH}"
-RUN wget https://bootstrap.pypa.io/get-pip.py && \
-	python get-pip.py && \
-	rm get-pip.py
+# RUN wget https://bootstrap.pypa.io/get-pip.py && \
+# 	python get-pip.py && \
+# 	rm get-pip.py
 
 # -- Create folders under root for following services
 USER 0
