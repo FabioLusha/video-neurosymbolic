@@ -5,6 +5,9 @@ from . import prompt_formatters as pf
 
 # Base directory and environment variables
 BASE_DIR = Path(__file__).parent.parent
+LOG_DIR = BASE_DIR / "logs"
+LOG_CONFIG_FILE = BASE_DIR / "src/configs/logging_config.yaml"
+
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 SEED = 13471225022025
 

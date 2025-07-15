@@ -4,30 +4,9 @@ import os
 
 from ._const import BASE_DIR
 
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("data_preprocessing")
 logger.setLevel(logging.DEBUG)
 
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
-ch.setFormatter(ch_fmt)
-
-fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-fh.setFormatter(fh_fmt)
-
-logger.addHandler(ch)
-logger.addHandler(fh)
 
 class PromptDataset:
     def __init__(
@@ -76,7 +55,6 @@ class PromptDataset:
             else:
                 raise ValueError("Could not identify the key to access the question id")
         return None
-            
 
     def print_stats(self):
         """Print statistics about the dataset."""
@@ -235,7 +213,7 @@ class STARDataset(PromptDataset):
                     logger.warn(f"{question_id:<20}: STSG not found or null-string.")
                     continue
 
-                sample['stsg'] = stsg
+                sample["stsg"] = stsg
                 filtered_qas.append(sample)
 
             self.qa = filtered_qas
@@ -258,7 +236,7 @@ class STARDataset(PromptDataset):
                 else:
                     # TODO: warn qa is not associated to a stsg
                     continue
-                
+
             self.qa = filtered_qas
         return
 
@@ -267,7 +245,7 @@ class STARDataset(PromptDataset):
             raise IndexError
 
         sample = self.qa[idx]
-        
+
         # tranfrom the choices field, discrading the program etc
         # need the check because the same element can be accessed
         # multiple times and we are modifying the structure in place

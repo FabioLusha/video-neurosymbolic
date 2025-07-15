@@ -6,39 +6,13 @@ import re
 from pathlib import Path
 
 from . import batch_processor
+from ._const import BASE_DIR
 from .ollama_manager import OllamaRequestManager
 from .prompt_formatters import ImgPromptDecorator, PromptFormatter
+from .utils import logg
 from .video_tools import generate_frames
 
 SEED = 13471225022025
-
-# Base directary is parent of current file's directory - star_code
-BASE_DIR = Path(__file__).parent.parent
-
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
-ch.setFormatter(ch_fmt)
-
-fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "%(asctime)s [%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-fh.setFormatter(fh_fmt)
-
-logger.addHandler(ch)
-logger.addHandler(fh)
 
 
 def _load_prompt_fromfile(filename):
@@ -56,86 +30,92 @@ def _load_model_options(options_file=None):
         with open(options_file) as in_file:
             return json.load(in_file)
     except IOError as e:
-        raise IOError(f"Error reading the model's options file {options_file}: {e}") from e
+        raise IOError(
+            f"Error reading the model's options file {options_file}: {e}"
+        ) from e
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Generate scene graph descriptions from video frames using Ollama models.'
+        description="Generate scene graph descriptions from video frames using Ollama models."
     )
-    
+
     parser.add_argument(
-        '--model',
+        "--model",
         type=str,
         required=True,
-        help='Ollama model to use for image captioning'
+        help="Ollama model to use for image captioning",
     )
-    
+
     parser.add_argument(
-        '--output-file',
+        "--output-file",
         type=str,
         required=True,
-        help='Path to save the generated scene graph descriptions'
+        help="Path to save the generated scene graph descriptions",
     )
-    
+
     parser.add_argument(
-        '--video-dir',
+        "--video-dir",
         type=str,
         required=True,
-        help='Directory containing the videos to process'
+        help="Directory containing the videos to process",
     )
-    
+
     parser.add_argument(
-        '--videos-metadata',
+        "--videos-metadata",
         type=str,
-        help='A JSON file containing the video-ids of the videos to be processed and metadata such as \'star\' and \'end\' specifying which part of the video to process'
+        help="A JSON file containing the video-ids of the videos to be processed and metadata such as 'star' and 'end' specifying which part of the video to process",
     )
-    
+
     parser.add_argument(
-        '--fps',
+        "--fps",
         type=float,
-        default=1.0,
-        help='Frames per second to sample from each video (default: 1.0)'
+        default=None,
+        help="Frames per second to sample from each video",
     )
-    
+
     parser.add_argument(
-        '--sys-prompt',
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Max number of frames to sample from each video",
+    )
+
+    parser.add_argument(
+        "--sys-prompt",
         type=str,
         default=None,
-        help='Path to text file containing system prompt (default: empty)'
+        help="Path to text file containing system prompt (default: empty)",
     )
 
     parser.add_argument(
-        '--usr-prompt',
+        "--usr-prompt",
         type=str,
         required=True,
-        help='Path to text file containing user prompt'
+        help="Path to text file containing user prompt",
     )
 
     parser.add_argument(
-        '--auto-reply',
+        "--auto-reply",
         type=str,
         required=True,
-        help='Path to text file containing auto-reply prompt'
+        help="Path to text file containing auto-reply prompt",
     )
 
     parser.add_argument(
-        '--model-options',
-        type=str,
-        help='Path to a JSON file containing model options'
+        "--model-options", type=str, help="Path to a JSON file containing model options"
     )
     parser.add_argument(
-        '--batch-images',
-        action='store_true',
-        help='If set, send all extracted frames for a video in a single batch request'
+        "--batch-images",
+        action="store_true",
+        help="If set, send all extracted frames for a video in a single batch request",
     )
-    
+
     return parser.parse_args()
 
-def main():
-    args = parse_arguments()
-    
+
+def main(args):
     # Process IDs if provided
     video_info = None
     if args.videos_metadata:
@@ -148,35 +128,34 @@ def main():
 
         logger.info(f"=== Loading file with videos metadata: {args.videos_metadata}")
         with open(videos_metadata_path, "r", encoding="utf-8") as f:
-            if ext == '.json':
+            if ext == ".json":
                 data = json.load(f)
                 if isinstance(data, list):
                     video_info = data
                 else:
-                    video_info = [data] # Wrap for consistency
-            elif ext == '.jsonl':
+                    video_info = [data]  # Wrap for consistency
+            elif ext == ".jsonl":
                 video_info = [json.loads(line.strip()) for line in f.readlines()]
             else:
                 raise ValueError(
-                    f"Unsupported file extension {ext}. "
-                    "Expected .json or .jsonl"
+                    f"Unsupported file extension {ext}. " "Expected .json or .jsonl"
                 )
             # remove duplicates and keeps only relevant metadata
             video_info = preprocess_videos_metadata(video_info)
             logger.warning(f"=== Generating graphs for {len(video_info)} videos")
     else:
         logger.warning("=== No video metadata file chosen")
-    
+
     url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-    
+
     # Load system prompt
     sys_prompt = None
     if args.sys_prompt:
         sys_prompt = _load_prompt_fromfile(args.sys_prompt)
-    
+
     # Load model options
     model_options = _load_model_options(args.model_options)
-    
+
     # Set up Ollama parameters
     ollama_params = {
         "model": args.model,
@@ -417,5 +396,10 @@ def streaming_frame_generation(
     graph_gen_pipeline.consume(situations)
     return
 
+
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    # define new filename for logs
+    logg.logging_setup(Path(args.output_file).stem)
+    logger = logging.getLogger("experiment")
+    main(args)

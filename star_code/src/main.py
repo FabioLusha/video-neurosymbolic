@@ -11,134 +11,11 @@ from ._const import (BASE_DIR, DEFAULT_INPUT_FILE, DEFAULT_MODEL_OPTIONS,
                      DEFAULT_PROMPTS, OLLAMA_URL, PROMPT_TYPES, TASK_TYPES)
 from .datasets import CVRRDataset, JudgeDataset, STARDataset
 from .ollama_manager import OllamaRequestManager
-
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
-ch.setFormatter(ch_fmt)
-
-fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-fh.setFormatter(fh_fmt)
-
-logger.addHandler(ch)
-logger.addHandler(fh)
+from .utils import logg
 
 
-def main():
-    """Main entry point for the application."""
-    # Step 1: Parse command line arguments
-    parser = argparse.ArgumentParser(description="Run LLM with different prompt types")
+def main(args):
 
-    parser.add_argument(
-        "--task",
-        choices=TASK_TYPES.keys(),
-        default="graph-understanding",
-        help="Choose the task to be performed",
-    )
-    parser.add_argument(
-        "--prompt-type",
-        choices=PROMPT_TYPES.keys(),
-        help="Type of prompt to use",
-    )
-    parser.add_argument(
-        "--sys-prompt",
-        help="Optional system prompt (pass 'default' to use default system prompt).",
-    )
-    parser.add_argument(
-        "--user-prompt",
-        help="User prompt (pass default to use 'defualt' prompt)",
-        required=True,
-    )
-    parser.add_argument(
-        "--model",
-        help="Which model to use from those available in Ollama",
-        required=True,
-    )
-    parser.add_argument(
-        "--model-options", help="Path to a JSON file containing model options"
-    )
-    parser.add_argument(
-        "--dataset-type",
-        choices=["star", "cvrr"],
-        required=True,
-        help="Type of dataset to use (STAR or CVRR)",
-    )
-    parser.add_argument("--input-file", help="Input dataset file path")
-    parser.add_argument(
-        "--ids-file",
-        help="Path to a file containing question IDs to process (one ID per line)",
-    )
-    parser.add_argument(
-        "--stsg-file",
-        help="File with the spatio-temporal scene graphs if these are not included in the main dataset",
-    )
-    parser.add_argument(
-        "--responses-file",
-        help="File with the responses to be evaluated by the judge"
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["generate", "chat"],
-        help="How to run the model, 'chat' or 'generate' mode",
-        default="generate",
-    )
-    parser.add_argument(
-        "--reply-file",
-        help="File with the text for the automatic reply when run in chat mode",
-    )
-    parser.add_argument(
-        "--output-file",
-        help="file path where to save the response"
-    )
-
-    parser.add_argument(
-        "--frames-dir",
-        type=str,
-        help="Directory with subfolders containing the extracted frames for each video",
-    )
-
-    parser.add_argument(
-        "--keyframes-info",
-        type=str,
-        help="A CSV file with the mapping question_id - video_id - keyframes",
-    )
-
-    parser.add_argument(
-        "--max-samples",
-        type=int,
-        default=5,
-        help="Maximum number of frames to sample per video (default: 5)",
-    )
-
-    parser.add_argument(
-        "--videos-dir",
-        type=str,
-        help="Directory with the videos associated to the questions",
-    )
-
-    parser.add_argument(
-        "--fps",
-        type=float,
-        help="frame-rate at which to sample images from the videos"
-    )
-
-    args = parser.parse_args()
-
-    # Step 2: Load prompts
     # Load system and user prompts based on arguments.
     system_prompt_path, user_prompt_path = DEFAULT_PROMPTS[args.prompt_type]
 
@@ -615,6 +492,111 @@ def stream_sgg(
     pipeline.consume(dataset)
 
 
+def define_cli():
+    """Main entry point for the application."""
+    # Step 1: Parse command line arguments
+    parser = argparse.ArgumentParser(description="Run LLM with different prompt types")
+
+    parser.add_argument(
+        "--task",
+        choices=TASK_TYPES.keys(),
+        default="graph-understanding",
+        help="Choose the task to be performed",
+    )
+    parser.add_argument(
+        "--prompt-type",
+        choices=PROMPT_TYPES.keys(),
+        help="Type of prompt to use",
+    )
+    parser.add_argument(
+        "--sys-prompt",
+        help="Optional system prompt (pass 'default' to use default system prompt).",
+    )
+    parser.add_argument(
+        "--user-prompt",
+        help="User prompt (pass default to use 'defualt' prompt)",
+        required=True,
+    )
+    parser.add_argument(
+        "--model",
+        help="Which model to use from those available in Ollama",
+        required=True,
+    )
+    parser.add_argument(
+        "--model-options", help="Path to a JSON file containing model options"
+    )
+    parser.add_argument(
+        "--dataset-type",
+        choices=["star", "cvrr"],
+        required=True,
+        help="Type of dataset to use (STAR or CVRR)",
+    )
+    parser.add_argument("--input-file", help="Input dataset file path")
+    parser.add_argument(
+        "--ids-file",
+        help="Path to a file containing question IDs to process (one ID per line)",
+    )
+    parser.add_argument(
+        "--stsg-file",
+        help="File with the spatio-temporal scene graphs if these are not included in the main dataset",
+    )
+    parser.add_argument(
+        "--responses-file",
+        help="File with the responses to be evaluated by the judge"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["generate", "chat"],
+        help="How to run the model, 'chat' or 'generate' mode",
+        default="generate",
+    )
+    parser.add_argument(
+        "--reply-file",
+        help="File with the text for the automatic reply when run in chat mode",
+    )
+    parser.add_argument(
+        "--output-file",
+        help="file path where to save the response"
+    )
+
+    parser.add_argument(
+        "--frames-dir",
+        type=str,
+        help="Directory with subfolders containing the extracted frames for each video",
+    )
+
+    parser.add_argument(
+        "--keyframes-info",
+        type=str,
+        help="A CSV file with the mapping question_id - video_id - keyframes",
+    )
+
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Maximum number of frames to sample per video (default: 5)",
+    )
+
+    parser.add_argument(
+        "--videos-dir",
+        type=str,
+        help="Directory with the videos associated to the questions",
+    )
+
+    parser.add_argument(
+        "--fps",
+        type=float,
+        help="frame-rate at which to sample images from the videos"
+    )
+
+    return parser.parse_args()
 
 if __name__ == "__main__":
-    main()
+    args = define_cli()
+    experiment_name = Path(args.output_file).stem
+
+    logg.logging_setup(experiment_name)
+
+    logger = logging.getLogger("experiment")
+    main(args)

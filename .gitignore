@@ -11,6 +11,7 @@ star_code/outputs
 star_code/models
 star_code/experiments/video_dump
 star_code/.env
+star_code/src/misc/video_chatgpt
 nltk_data
 
 # ignore python temporary and compiled files

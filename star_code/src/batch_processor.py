@@ -1,37 +1,18 @@
 import json
+import logging
 import os
 import traceback
 from datetime import datetime
-import requests
 from pathlib import Path
-import logging
+
+import requests
 
 # star_code
 BASE_DIR = Path(__file__).parent / "logs"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("system")
 logger.setLevel(logging.DEBUG)
-
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
-ch.setFormatter(ch_fmt)
-
-fh = logging.FileHandler(str(BASE_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-fh.setFormatter(fh_fmt)
-
-logger.addHandler(ch)
-logger.addHandler(fh)
-
 
 class Pipeline:
 

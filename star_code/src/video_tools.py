@@ -7,28 +7,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-# star_code
-BASE_DIR = Path(__file__).parent.parent / "logs"
-BASE_DIR.mkdir(parents=True, exist_ok=True)
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("video_preprocessing")
 logger.setLevel(logging.DEBUG)
-
-# create console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.NOTSET)  # delegate filtering to logger
-console_handler_fmt = logging.Formatter("=[%(levelname)s] :- %(message)s")
-console_handler.setFormatter(console_handler_fmt)
-
-file_handler = logging.FileHandler(str(BASE_DIR / "star_code.log"))
-file_handler.setLevel(logging.WARNING)
-file_handler_fmt = logging.Formatter(
-    "%(asctime)s [%(levelname)s] - %(name)s :- %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
-file_handler.setFormatter(file_handler_fmt)
-
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
 
 
 def get_video_stream_info(video_path):
@@ -57,10 +37,10 @@ def get_video_stream_info(video_path):
 
 def extract_frames(
     video_path,
-    fps=1,
-    max_frames=None,
+    fps=None,
     start_time=None,
     end_time=None,
+    max_frames=None,
     output_dir=None,
 ):
     """Extract num_frames uniformly sampled frames from the video within specified time range.
@@ -72,6 +52,10 @@ def extract_frames(
         start_time: Start time in seconds (default: 0)
         end_time: End time in seconds (default: None, meaning end of video)
     """
+
+    # hardcoded lower bound for fps
+    if not fps:
+        fps = 5
 
     temp_dir = tempfile.mkdtemp()
     if output_dir:
@@ -88,13 +72,13 @@ def extract_frames(
     ]
 
     # set start time
-    start_time = start_time or 0.0
+    start_time = float(start_time or 0.0)
     if start_time and start_time > 0:
         cmd += ["-ss", str(start_time)]
 
     cmd += ["-i", video_path]
     # Limit duration if end_time is set
-    end_time = end_time or duration
+    end_time = float(end_time or duration)
     if end_time > duration:
         end_time = duration
 
@@ -109,11 +93,8 @@ def extract_frames(
         )
 
     # video filter for fps
-    cmd += ["-vf", f"fps={fps}"]
-
-    # Limit the number of frames
-    if max_frames:
-        cmd += ["-frames:v", str(max_frames)]
+    if fps:
+        cmd += ["-vf", f"fps={fps}"]
 
     # Quality (2 is high qyality, lower values are better)
     cmd += ["-q:v", "2"]
@@ -124,6 +105,13 @@ def extract_frames(
 
     frame_paths = sorted(list(Path(temp_dir).glob("frame_*.png")))
 
+    if max_frames and len(frame_paths) > max_frames:
+        total = len(frame_paths)
+        step = total / max_frames
+        indices = [min(int((i + 0.05) * step), total - 1) for i in range(max_frames)]
+        frame_paths = [frame_paths[i] for i in indices]
+
+    logger.debug(f"Extracting {len(frame_paths)} frames")
     return temp_dir, frame_paths
 
 
@@ -185,7 +173,7 @@ def generate_video_frames(video_path, fps=1, start=None, end=None, max_frames=No
                 )
 
 
-def generate_frames(video_dir, fps, video_info=None, output_dir=None):
+def generate_frames(video_dir, fps, video_info=None, max_frames=None, output_dir=None):
     """
     Generate frames from specific videos in a directory with custom time ranges.
 
@@ -225,6 +213,7 @@ def generate_frames(video_dir, fps, video_info=None, output_dir=None):
                 fps,
                 start_time=start_time,
                 end_time=end_time,
+                max_frames=max_frames,
                 output_dir=video_frames_dir,
             )
 

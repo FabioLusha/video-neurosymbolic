@@ -8,34 +8,14 @@ import requests
 
 Result = namedtuple("Result", ["status", "client", "id", "payload", "response"])
 
-# Base directary is parent of current file's directory - star_code
+# Base directory is parent of current file's directory - star_code
 BASE_DIR = Path(__file__).parent.parent
 
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("system")
 logger.setLevel(logging.DEBUG)
-
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.NOTSET) # delegate filtering to logger
-ch_fmt = logging.Formatter(
-    "=[%(levelname)s] :- %(message)s"
-)
-ch.setFormatter(ch_fmt)
-
-fh = logging.FileHandler(str(LOG_DIR / "star_code.log"))
-fh.setLevel(logging.WARNING)
-fh_fmt = logging.Formatter(
-    "=[%(asctime)s][%(levelname)s] - %(name)s :- %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-fh.setFormatter(fh_fmt)
-
-logger.addHandler(ch)
-logger.addHandler(fh)
-
 
 
 class OllamaRequestManager:
@@ -50,7 +30,6 @@ class OllamaRequestManager:
         self.default_handlers = dict()
         self.default_handlers["generate"] = OllamaGenerateHandler()
         self.default_handlers["chat"] = OllamaChatHandler()
-
 
     def load_model(self):
         logger.info(f" Loading model {self.ollama_params['model']} ".center(40, "="))

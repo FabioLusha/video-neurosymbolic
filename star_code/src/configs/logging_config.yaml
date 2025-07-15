@@ -1,0 +1,50 @@
+version: 1
+disable_existing_loggers: False # Keep existing loggers if any
+
+formatters:
+  bare-bones:
+    format: '[%(levelname)s] : %(message)s'
+  simple:
+    format: '[%(asctime)s - %(name)s - %(levelname)s] : %(message)s'
+  verbose:
+    format: '[%(asctime)s - %(name)s - %(levelname)s] - [%(filename)s:%(lineno)d] - %(message)s'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: bare-bones
+
+  file:
+    class: logging.handlers.RotatingFileHandler
+    # The filename will be dynamically set by our code
+    # We'll use a placeholder here for initial setup, or leave it out if we handle it fully in code
+    filename: temp_placeholder.log
+    backupCount: 5
+    level: WARNING
+    formatter: verbose
+
+loggers:
+  video_processing:
+    level: DEBUG
+    handlers: [file, console]
+    propagte: False
+
+  data_preprocessing:
+    level: DEBUG
+    handlers: [file, console]
+    propagate: False
+
+  system:
+    level: DEBUG
+    handlers: [file, console]
+    propagate: False
+
+  experiment:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
+
+root:
+  level: ERROR # Set a high level for the root logger to avoid excessive default logging
+  handlers: [console] # Only send root logger messages to the console (avoiding file duplication)
