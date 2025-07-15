@@ -203,9 +203,9 @@ def gemma3_ans_extract(input_filepath):
     ans_df["answer"] = ans_df["answer"].str.strip()
 
     original_df.loc[:, "contains_answer"] = False
-    original_df.loc[contains_answer, "contains_answer"] = contains_answer
+    original_df.loc[contains_answer[contains_answer].index, "contains_answer"] = contains_answer
 
-    original_df.loc[:, "answer"] = None
-    original_df.loc[contains_answer, "answer"] = ans_df["answer"]
+    original_df.loc[:, "answer"] = ""
+    original_df.loc[contains_answer[contains_answer].index, "answer"] = ans_df["answer"]
 
     return original_df
