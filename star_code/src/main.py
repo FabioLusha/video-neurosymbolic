@@ -169,7 +169,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                         reply,
                         args.frames_dir,
                         videos_info,
-                        args.max_samples,
+                        args.max_frames,
                         output_filepath,
                     )
                 elif args.videos_dir:
@@ -179,6 +179,7 @@ def process_prompts(ollama_client, dataset, mode, args, output_filepath):
                         reply           = reply,
                         videos_dir      = args.videos_dir,
                         fps             = args.fps,
+                        max_frames      = args.max_frames,
                         output_filepath = output_filepath,
                     )
             else:
@@ -264,6 +265,7 @@ def stream_vqa_video(
     reply,
     videos_dir,
     fps,
+    max_frames,
     output_filepath
 ):
 
@@ -280,6 +282,7 @@ def stream_vqa_video(
                 fps,
                 start,
                 end,
+                max_frames=max_frames
             )
 
             if not keyframes:
@@ -290,6 +293,8 @@ def stream_vqa_video(
 
             encodings = [frame["encoding"] for frame in keyframes]
 
+            prompt = datum["prompt"]
+            logger.debug(prompt)
             req_obj = {
                 "qid": question_id,  # situation is list of [{question_id, frame_id, encoding}]
                 "payload": {
@@ -297,7 +302,7 @@ def stream_vqa_video(
                     "messages": [
                         {
                             "role": "user",
-                            "content": datum["prompt"],
+                            "content": prompt,
                             "images": encodings,
                         }
                     ],

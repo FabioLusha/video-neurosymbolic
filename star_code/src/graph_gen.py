@@ -166,42 +166,40 @@ def main(args):
 
     # Create Ollama client
     client = OllamaRequestManager(url, ollama_params)
-    
+
     usr_prompt = _load_prompt_fromfile(args.usr_prompt)
     reply = _load_prompt_fromfile(args.auto_reply)
     # Run frame generation
     streaming_frame_generation(
         client,
-        args.video_dir, 
-        args.output_file, 
+        args.video_dir,
+        args.output_file,
         video_info=video_info,
         usr_prompt=usr_prompt,
         reply=reply,
         fps=args.fps,
+        max_frames=args.max_frames,
         batch_images=args.batch_images,
     )
+
 
 def preprocess_videos_metadata(dataset):
     video_info = []
     seen = set()
 
     for data_point in dataset:
-        video_id = data_point['video_id']
-        start = data_point.get('start', None)
-        end = data_point.get('end', None)
-        
+        video_id = data_point["video_id"]
+        start = data_point.get("start", None)
+        end = data_point.get("end", None)
+
         if (video_id, start, end) in seen:
             continue
 
-
         seen.add((video_id, start, end))
-        video_info.append({
-            'video_id': video_id,
-            'start': start,
-            'end': end
-        })
+        video_info.append({"video_id": video_id, "start": start, "end": end})
 
     return video_info
+
 
 def extract_frame_description(text):
     """
@@ -218,6 +216,7 @@ def extract_frame_description(text):
     match = re.search(pattern, text)
 
     return match.group(0) if match else ""
+
 
 def frame_aggregator(stream):
     """
@@ -267,20 +266,22 @@ def img_payload_gen(
         logger.info(f" - interval: {start}-{end}")
         logger.info(f" - {len(frames)} frames.")
 
-
         payloads = []
         if not frames:
-            logger.warning(f"Warning: Couldn't extract frames from video {video_id}. Skipping")
+            logger.warning(
+                f"Warning: Couldn't extract frames from video {video_id}. Skipping"
+            )
             continue
 
         if batch_images:
             # add img tags delimited by text to help the VLM separate frames
             img_pformatter = ImgPromptDecorator(
-                    PromptFormatter(usr_prompt), 
-                    img_field="images", # expecting a format string with {images}
-                    tag="[img]" # using ollama images tag
+                PromptFormatter(usr_prompt),
+                img_field="images",  # expecting a format string with {images}
+                tag="[img]",  # using ollama images tag
             )
-            usr_promtp_wtags = img_pformatter.format({"images": frames})
+            usr_prompt_wtags = img_pformatter.format({"images": frames})
+            logger.debug(usr_prompt_wtags)
             req_obj = {
                 # qid for backward compatibility
                 "qid": video_id,
@@ -288,16 +289,19 @@ def img_payload_gen(
                 "end": end,
                 "payload": {
                     **ollama_params,
-                    "messages": [{
-                        "role": "user",
-                        "content": usr_promtp_wtags,
-                        "images": [f["encoding"] for f in frames],
-                    }],
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": usr_prompt_wtags,
+                            "images": [f["encoding"] for f in frames],
+                        }
+                    ],
                 },
             }
             payloads = [req_obj]
         else:
             for frame in frames:
+                logger.debug(usr_prompt)
                 req_obj = {
                     # qid for backward compatibility
                     "qid": video_id,
@@ -326,9 +330,10 @@ def streaming_frame_generation(
     output_file_path,
     usr_prompt,
     reply,
+    fps,
+    max_frames,
     video_info=None,
-    fps=1.0,
-    batch_images=False
+    batch_images=False,
 ):
     """
     Generate scene graph descriptions for video frames.
@@ -356,42 +361,37 @@ def streaming_frame_generation(
                 # now let the aggregator generate the stream
                 yield from frame_aggregator(mapped)
 
-
     bp = batch_processor
     graph_gen_pipeline = bp.Pipeline(
         lambda situations: img_payload_gen(
-            ollama_client.ollama_params,
-            situations,
-            usr_prompt,
-            batch_images
+            ollama_client.ollama_params, situations, usr_prompt, batch_images
         ),
         lambda payload_gen: bp.stream_request(
-            payload_gen,
-            ollama_client,
-            endpoint="chat"
+            payload_gen, ollama_client, endpoint="chat"
         ),
         lambda stream: bp.auto_reply_gen(stream, reply),
         # check the response is ok before passing to frame_extraction,
-        lambda stream: (o for o in stream \
-            if o["status"] == "ok" \
-                # A trick to log the error and skip the object.
-                # if the status is not ok, we will log the error,
-                # logging returns None, therefore the condition will always be False
-                or logger.error(
-                    f"VLM failed to generate a proper output for {o.get('video_id', o.get('qid', 'unknown'))}:"
-                    f"{o.get('error', 'No error info')}"
-                )
+        lambda stream: (
+            o
+            for o in stream
+            if o["status"] == "ok"  # A trick to log the error and skip the object.
+            # if the status is not ok, we will log the error,
+            # logging returns None, therefore the condition will always be False
+            or logger.error(
+                f"VLM failed to generate a proper output for {o.get('video_id', o.get('qid', 'unknown'))}:"
+                f"{o.get('error', 'No error info')}"
+            )
         ),
         _stream_batch_condition,
         lambda stream: bp.stream_save(
-            stream,
-            bp.GeneratedGraphFormatter(),
-            output_file_path
+            stream, bp.GeneratedGraphFormatter(), output_file_path
         ),
     )
     situations = (
         situation_frames
-        for situation_frames in generate_frames(video_dir, fps, video_info=video_info)
+        for situation_frames in generate_frames(
+            video_dir, fps=fps, max_frames=max_frames, video_info=video_info
+        )
     )
     graph_gen_pipeline.consume(situations)
     return
