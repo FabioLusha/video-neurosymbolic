@@ -30,7 +30,7 @@ def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
         predictor_labels = [f"Prediction {i}" for i in range(1, len(predictors) + 1)]
 
     question = gt_dataset_df.loc[idx]["question"]
-    gt_answer = gt_dataset_df.loc[idx]["answer"]
+    gt_answer = gt_dataset_df.loc[idx].get("answer", None) or gt_dataset_df.loc[idx].get("text")
 
     print(f"\n┌─ Sample: {str(idx)} " + "─" * (80 - len(str(idx))))
     print("│")
@@ -52,7 +52,7 @@ def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
 
     for pred, label in zip(predictors, predictor_labels):
         reasoning = pred.loc[idx]["chat_history"][1]["content"]
-        answer = pred.loc[idx]["answer"]
+        answer = pred.loc[idx].get("answer", None) or pred.loc[idx]["pred_text"]
 
         status = "[CORRECT]" if answer.lower() == gt_answer.lower() else "[WRONG]"
         print("|")
@@ -85,15 +85,13 @@ def upload_and_visualize_video(videopath, server_url="http://localhost:10882"):
             print(response.text)
 
 
-def vis_video_frames(data, raw_video_dir, save_video_dir, fps=1):
+def vis_video_frames(data, raw_video_dir, fps=1):
 
     start = round(data['start'], 2) # start time
     end = round(data['end'], 2) # end time
     video_id = data['video_id']
 
     in_path = raw_video_dir / f"{video_id}.mp4"
-    out_path = save_video_dir / f"{data['question_id']}.mp4"
-
     print('\tVideo Seg: ', str(start) + 's', '-', str(end) + 's')
     frames = video_tools.generate_video_frames(in_path, fps, start, end)
     if not frames:

@@ -12,4 +12,7 @@ You are an intelligent video comprehension model and are going to receive as inp
 Further instructions:
 - In describing the scene make sure to cite which frame are you referring to.
 
+The frames:
 {images}
+
+When generating your description Think step-by-step.
