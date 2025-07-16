@@ -1,4 +1,0 @@
-curl -X POST http://localhost:11434/api/generate -d '{
-  "model": "tinyllama",
-  "prompt": "Tell me a simple joke", "stream":false
-}'

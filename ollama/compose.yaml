@@ -14,14 +14,15 @@ services:
     ports:  
       - "11435:11435"
     volumes:
-      - /multiverse/datasets/shared/ollama_models:/.ollama
+      #- /multiverse/datasets/shared/ollama_models:/.ollama
+      - /multiverse/storage/lusha/ollama/ollama_models:/.ollama
     container_name: ${USER}_ollama
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["2"]
+              device_ids: ["3"]
               capabilities: [gpu]
     cpuset: "12-19"
     restart: "no"
