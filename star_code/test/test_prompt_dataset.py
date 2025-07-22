@@ -38,7 +38,19 @@ class TestPromptDataset(unittest.TestCase):
         # Simple prompt formatter for testing
         cls.prompt_formatter = pf.OpenEndedPrompt("Q: {question} STSG: {stsg}")
 
-    def test_missing_stsg_for_q(self):
+    def test_missing_stsg_for_q_PromptDataset(self):
+        with open("test/test_files/qa_file1.jsonl", "r") as f:
+            qa_data = [json.loads(line) for line in f.readlines()]
+
+        dataset = PromptDataset(
+            "test/test_files/qa_file1.jsonl",
+            self.prompt_formatter,
+            "test/test_files/stsg1_missing1.jsonl",
+        )
+
+        assert len(dataset) == len(qa_data) - 1
+
+    def test_missing_stsg_for_q_STARDataset(self):
         with open("test/test_files/qa_file1.jsonl", "r") as f:
             qa_data = [json.loads(line) for line in f.readlines()]
 

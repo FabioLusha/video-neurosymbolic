@@ -2,8 +2,6 @@ import json
 import logging
 import os
 
-from ._const import BASE_DIR
-
 logger = logging.getLogger("data_preprocessing")
 logger.setLevel(logging.DEBUG)
 
@@ -134,7 +132,18 @@ class PromptDataset:
                 continue
 
     def preprocess(self):
-        pass
+        if not self.stsg_file_path:
+            return
+
+        filtered_qa = []
+        for sample in self.qa:
+            stsg = self.stsgs.get(sample[self.stsg_id_key], None)
+            if stsg:
+                sample["stsg"] = stsg
+                filtered_qa.append(sample)
+
+        self.qa = filtered_qa
+        return
 
     def __len__(self):
         return len(self.qa)
@@ -148,7 +157,7 @@ class PromptDataset:
 
         # Add STSG to sample if available
         if video_id and video_id in self.stsgs:
-            sample["stsg"] = self.stsgs[video_id]
+            sample["stsg"] = self.stsgs[self.stsg_id_key]
 
         sample["qid"] = sample.get(self.q_id_key)
         sample["prompt"] = self.prompt_formatter.format(sample)
@@ -157,7 +166,6 @@ class PromptDataset:
 
 
 class STARDataset(PromptDataset):
-
     def _load_stsg_data(self):
         """Load all STSG data into memory (video_id -> stsg dict)."""
         if not os.path.exists(self.stsg_file_path):
@@ -253,15 +261,14 @@ class STARDataset(PromptDataset):
             sample["choices"] = {
                 str(choice["choice_id"]): choice["choice"]
                 for choice in sample["choices"]
-                }
-            
+            }
+
         sample["qid"] = sample[self.q_id_key]  # question_id
         sample["prompt"] = self.prompt_formatter.format(sample)
         return sample
 
 
 class CVRRDataset(PromptDataset):
-
     def get_id_key(self):
         # return question_id cause of the prepocessing
         return "question_id"
@@ -275,7 +282,6 @@ class CVRRDataset(PromptDataset):
 
 
 class JudgeDataset(PromptDataset):
-
     def __init__(self, dataset, predictions_filepath, prompt_formatter):
         self._wrapped = dataset
 
@@ -284,7 +290,6 @@ class JudgeDataset(PromptDataset):
         key_name = "qid" if data[0].get("qid", None) else "question_id"
         for pred in data:
             predictions[pred[key_name]] = pred
-
 
         for sample in self.qa:
             sample["gt_answer"] = sample["answer"]
@@ -299,4 +304,4 @@ class JudgeDataset(PromptDataset):
         if name == "_wrapped":
             object.__setattr__(self, name, value)
         else:
-            setattr(self._wrapped, name, value) 
+            setattr(self._wrapped, name, value)
