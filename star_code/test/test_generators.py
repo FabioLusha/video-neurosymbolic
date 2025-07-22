@@ -1,22 +1,13 @@
 import json
 import os
-import subprocess
-import sys
-import tempfile
-import time
 import unittest
 
-sys.path.append("../src")
-
-import batch_processor as bp
-import prompt_formatters as pf
+from src import batch_processor as bp
 
 # noqa: E402 - disables the warning for this line
-from ollama_manager import OllamaRequestManager  # noqa: E402
 
 
 class GeneratorTestUnit(unittest.TestCase):
-
     def test_save(self):
         output_filename = "test_output_generators/output.jsonl"
 

@@ -1,20 +1,11 @@
 import json
-import os, sys
-from pathlib import Path
-import subprocess
+import os
 import tempfile
-import time
 import unittest
+
 import pytest
-
-import requests
-
-# Add src directory to path FIRST (before other imports)
-src_path = str(Path(__file__).parent.parent / "src")
-sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
-
-import prompt_formatters as pf
-from datasets import PromptDataset
+from src import prompt_formatters as pf
+from src.datasets import PromptDataset, STARDataset
 
 
 class TestPromptDataset(unittest.TestCase):
@@ -47,6 +38,18 @@ class TestPromptDataset(unittest.TestCase):
         # Simple prompt formatter for testing
         cls.prompt_formatter = pf.OpenEndedPrompt("Q: {question} STSG: {stsg}")
 
+    def test_missing_stsg_for_q(self):
+        with open("test/test_files/qa_file1.jsonl", "r") as f:
+            qa_data = [json.loads(line) for line in f.readlines()]
+
+        dataset = STARDataset(
+            "test/test_files/qa_file1.jsonl",
+            self.prompt_formatter,
+            "test/test_files/stsg1_missing1.jsonl",
+        )
+
+        assert len(dataset) == len(qa_data) - 1
+
     @classmethod
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
@@ -59,7 +62,8 @@ class TestPromptDataset(unittest.TestCase):
             self.prompt_formatter.format({**self.qa_data[0], **self.stsg_data[0]}),
             "Q: q1 STSG: object1",
         )
-    @pytest.mark.skip(reason="The functionality is deprecated in the new version") 
+
+    @pytest.mark.skip(reason="The functionality is deprecated in the new version")
     def test_getitem_with_stsg(self):
         """Test __getitem__ with STSG data"""
         dataset = PromptDataset(
