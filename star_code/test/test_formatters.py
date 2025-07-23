@@ -1,13 +1,8 @@
 import json
 import random
-import sys
-import tempfile
 import unittest
 
-sys.path.append("../src")
-
-
-import prompt_formatters as pf  # noqa: E402
+from src import prompt_formatters as pf  # noqa: E402
 
 SEED = 11270525022025
 random.seed(SEED)
@@ -15,7 +10,7 @@ random.seed(SEED)
 
 class PromptFormatterTest(unittest.TestCase):
     def setUp(self):
-        input_filename = "../data/datasets/STAR_QA_and_stsg_val.json"
+        input_filename = "data/datasets/STAR_QA_and_stsg_val.json"
 
         with open(input_filename, "r") as in_file:
             q_stsg_data = json.load(in_file)
@@ -23,7 +18,7 @@ class PromptFormatterTest(unittest.TestCase):
             self.sample = q_stsg_data[idx]
 
     def test_simple_prompt(self):
-        prompt_format = "QUESTION: {question}\n" "SPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
+        prompt_format = "QUESTION: {question}\nSPATIO-TEMPORAL SCENE-GRAPH: {stsg}"
 
         question = self.sample["question"]
         stsg = self.sample["stsg"]
@@ -35,9 +30,7 @@ class PromptFormatterTest(unittest.TestCase):
         self.assertEqual(gt_prompt, test_prompt)
 
     def test_mcq_prompt(self):
-        prompt_format = (
-            "Q: {question}\n" "{c1}\n{c2}\n{c3}\n{c4}\n" "STSG: {stsg}\n" "A:"
-        )
+        prompt_format = "Q: {question}\n{c1}\n{c2}\n{c3}\n{c4}\nSTSG: {stsg}\nA:"
 
         question = self.sample["question"]
         stsg = self.sample["stsg"]

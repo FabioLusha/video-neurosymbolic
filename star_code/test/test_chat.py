@@ -1,30 +1,25 @@
 import json
-import os, sys
-from pathlib import Path
 import subprocess
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
-
-# Add src directory to path FIRST (before other imports)
-src_path = str(Path(__file__).parent.parent / "src")
-sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
-
-import batch_processor
-import prompt_formatters as pf  # noqa: E402
-from chat_utils import ChatServer
+from src import batch_processor
+from src import prompt_formatters as pf  # noqa: E402
+from src.chat_utils import ChatServer
 
 # noqa: E402 - disables warning for this line
-from datasets import PromptDataset
-from ollama_manager import OllamaRequestManager
+from src.datasets import PromptDataset
+from src.ollama_manager import OllamaRequestManager
 
 
 class TestChatService(unittest.TestCase):
-
     def setUp(self):
         # start the server
-        self.server = subprocess.Popen(["python", "scaffold_server.py"])
+        self.server = subprocess.Popen(
+            ["python", str(Path(__file__).parent / "scaffold_server.py")]
+        )
         print("Started the Scaffold Server")
 
         # Wait for the server to start
@@ -91,7 +86,7 @@ class TestChatService(unittest.TestCase):
             json.dump(test_data, in_f)
             in_f.seek(0)
 
-            prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+            prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
             prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
             dataset = PromptDataset(in_f.name, prompt_formatter)

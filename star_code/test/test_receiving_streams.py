@@ -1,24 +1,21 @@
 import json
-import os, sys
-from pathlib import Path
+import os
 import subprocess
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 import requests
 
-# Add src directory to path FIRST (before other imports)
-src_path = str(Path(__file__).parent.parent / "src")
-sys.path.insert(0, src_path)  # Insert at start to prioritize local imports
+from src import batch_processor
+from src import batch_processor as bp
 
-import batch_processor
-import batch_processor as bp
 # noqa: E402 - disables the warning for this line
-import ollama_manager as om
-import prompt_formatters as pf
-from ollama_manager import OllamaRequestManager  # noqa: E402
-from datasets import PromptDataset
+from src import ollama_manager as om
+from src import prompt_formatters as pf
+from src.datasets import PromptDataset
+from src.ollama_manager import OllamaRequestManager  # noqa: E402
 
 
 class StreamingReceiverTestUnit(unittest.TestCase):
@@ -48,7 +45,9 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             f.write("You are a helpful assistant.")
 
         # Start the server
-        self.server = subprocess.Popen(["python", "scaffold_server.py"])
+        self.server = subprocess.Popen(
+            ["python", Path(__file__).parent / "scaffold_server.py"]
+        )
         print("Started the Scaffold Server")
 
         # Wait for the server to start
@@ -108,7 +107,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             ollama_params={"model": "llama2"},
         )
 
-        prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+        prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
         prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
         # Initialize the generator
@@ -144,7 +143,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             ollama_params={"model": "llama2"},
         )
 
-        prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+        prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
         prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
         # Initialize the generator
@@ -195,7 +194,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             json.dump(test_data, in_f)
             in_f.seek(0)
 
-            prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+            prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
             prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
             # Initialize the generator
@@ -239,7 +238,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             json.dump(test_data, in_f)
             in_f.seek(0)
 
-            prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+            prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
             prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
             # Initialize the generator
@@ -338,7 +337,7 @@ class StreamingReceiverTestUnit(unittest.TestCase):
             json.dump(test_data, in_f)
             in_f.seek(0)
 
-            prompt_format = "QUESTION: {question}\n" "STSG: {stsg}"
+            prompt_format = "QUESTION: {question}\nSTSG: {stsg}"
             prompt_formatter = pf.OpenEndedPrompt(prompt_format)
 
             # Initialize the generator
