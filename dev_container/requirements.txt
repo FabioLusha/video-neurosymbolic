@@ -1,3 +1,7 @@
+# utils
+Deprecated
+google-genai
+
 # web
 fastapi
 urllib3
@@ -6,6 +10,7 @@ nest
 requests
 responses
 
+# text
 regex
 gensim
 nltk

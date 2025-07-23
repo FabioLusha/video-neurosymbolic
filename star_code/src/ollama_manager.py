@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from collections import namedtuple
 from pathlib import Path
 
@@ -19,7 +18,6 @@ logger.setLevel(logging.DEBUG)
 
 
 class OllamaRequestManager:
-
     def __init__(self, base_url, ollama_params):
         self.base_url = base_url
         self.model = ollama_params["model"]
@@ -67,7 +65,6 @@ class OllamaRequestManager:
     def ollama_completion_request(
         self, payload, endpoint="generate", handler=None, req_timeout=60
     ):
-
         if handler is None:
             handler = self.default_handlers[endpoint]
 
@@ -95,7 +92,7 @@ class OllamaRequestManager:
                         elapsed = data.get("eval_duration", "")
                         ntokens = data.get("eval_count", "")
 
-                        print(f"\n\nResponse at: {ntokens/elapsed * 10**9:.1f} tk/s")
+                        print(f"\n\nResponse at: {ntokens / elapsed * 10**9:.1f} tk/s")
                         break
 
                     result = handler.process_chunk(data, result)

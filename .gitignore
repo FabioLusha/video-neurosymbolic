@@ -13,6 +13,7 @@ star_code/models
 star_code/experiments/video_dump
 star_code/notebooks/outputs
 star_code/.env
+star_code/webapp
 star_code/src/misc/Video-ChatGPT
 star_code/src/misc/video_chatgpt
 nltk_data
@@ -22,6 +23,5 @@ nltk_data
 *.py[cod]
 *$py.class
 
-# ignore .env files - may contain sensible data
-**/.env
+# ignore private.env files - may contain sensible data
 *private.env
