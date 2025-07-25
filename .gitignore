@@ -14,6 +14,8 @@ star_code/experiments/video_dump
 star_code/notebooks/outputs
 star_code/.env
 star_code/webapp
+star_code/scripts/data
+star_code/scripts/output
 star_code/src/misc/Video-ChatGPT
 star_code/src/misc/video_chatgpt
 nltk_data

@@ -1,0 +1,268 @@
+import json
+import sys
+from pathlib import Path
+import base64
+import argparse
+import logging
+
+
+SRC_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(SRC_DIR))
+
+from src.utils import logg
+from src.datasets import STARDataset
+from src import (
+    video_tools,
+    prompt_formatters,
+    main,
+)
+
+# If you need to disable safety settings
+# SAFETY_SETTINGS = {
+#     "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+#     "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+#     "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+#     "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+# }
+
+# Config schema:
+# https://ai.google.dev/api/generate-content#generationconfig
+# {
+#   "stopSequences": [
+#     string
+#   ],
+#   "responseMimeType": string,
+#   "responseSchema": {
+#     object (Schema)
+#   },
+#   "responseJsonSchema": value,
+#   "responseModalities": [
+#     enum (Modality)
+#   ],
+#   "candidateCount": integer,
+#   "maxOutputTokens": integer,
+#   "temperature": number,
+#   "topP": number,
+#   "topK": integer,
+#   "seed": integer,
+#   "presencePenalty": number,
+#   "frequencyPenalty": number,
+#   "responseLogprobs": boolean,
+#   "logprobs": integer,
+#   "enableEnhancedCivicAnswers": boolean,
+#   "speechConfig": {
+#     object (SpeechConfig)
+#   },
+#   "thinkingConfig": {
+#     object (ThinkingConfig)
+#   },
+#   "mediaResolution": enum (MediaResolution)
+# }
+DEFAULT_GEN_CONFIG_ENTRY = {
+"generationConfig": {
+    "thinkingConfig": {
+        "thinkingBudget": 0 # Disable thinking
+    },
+    "maxOutputTokens": 2048,
+    "seed": 6,
+}
+}
+
+
+def vqa_format(
+    key,
+    text,
+    b64images,
+    gen_config=DEFAULT_GEN_CONFIG_ENTRY,
+    safety_settings=None
+):
+    format = {
+        "key": key,
+        "request": {
+            "contents": [{
+                "role": "user",
+                "parts": [{"text": text}] + \
+                    [{"inline_data": {"mime_type": "image/png", "data": b64_enc}}
+                    for b64_enc in b64images], 
+            }]
+        }
+    }
+
+    format.update(gen_config)
+    # TODO: Add safety settings if needed
+    return format
+
+def batch(star_dataset, videos_dir, fps, max_frames, out_filepath, gen_config=DEFAULT_GEN_CONFIG_ENTRY, limit_n=None):
+
+
+    out_filepath = Path(out_filepath)
+    if out_filepath.exists():
+        logger.info(f"File {out_filepath} already exists! Not writing")
+        return
+
+    out_filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    limit_n = limit_n or len(star_dataset)
+    for i in range(limit_n):
+        sample = star_dataset[i]
+
+        _, frame_paths = video_tools.extract_frames(
+            video_path = f"{videos_dir}/{sample['video_id']}.mp4",
+            start_time = float(sample['start']),
+            end_time   = float(sample['end']),
+            fps        = fps,
+            max_frames = max_frames,
+        )
+
+
+        b64encodings = []
+        for fpath in frame_paths:
+            with open(fpath, "rb") as f:
+                enc = base64.b64encode(f.read()).decode("utf-8")
+                b64encodings.append(enc)
+
+        generate_content_request = vqa_format(
+            key        = sample['question_id'],
+            text       = sample['prompt'],
+            b64images  = b64encodings,
+            gen_config = gen_config,
+        )
+
+        with open(out_filepath, 'a') as out:
+            line = json.dumps(generate_content_request) + "\n"
+            out.write(line)
+
+    return
+
+def define_cli():
+    """
+    Defines and parses command-line arguments for the batch function.
+
+    Returns:
+        argparse.Namespace: An object containing the parsed arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Process a star dataset to generate VQA requests from video frames."
+    )
+
+    parser.add_argument(
+        "--input-dataset",
+        type=str,
+        required=True,
+        help="Path to the STAR dataset."
+    )
+    parser.add_argument(
+        "--user-prompt",
+        help="User prompt (pass default to use 'defualt' prompt)",
+        required=True,
+    )
+    parser.add_argument(
+        "--videos-dir",
+        type=str,
+        required=True,
+        help="Directory containing the video files."
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        required=True,
+        help="Frames per second to extract from videos."
+    )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        required=True,
+        help="Maximum number of frames to extract."
+    )
+    parser.add_argument(
+        "--output-file",
+        type=str,
+        required=True,
+        help="Path to the output file where VQA requests will be written."
+    )
+    parser.add_argument(
+        "--gen-config",
+        type=str,
+        default=json.dumps(DEFAULT_GEN_CONFIG_ENTRY),
+        help=f"JSON string of generation configuration (e.g., '{{\"temperature\": 0.7}}'). "
+             f"Defaults to {json.dumps(DEFAULT_GEN_CONFIG_ENTRY)}."
+    )
+    parser.add_argument(
+        "--limit-n",
+        type=int,
+        default=None,
+        help="Limit the number of samples to process from the dataset (first n)."
+    )
+    parser.add_argument(
+        "--chunks",
+        type=int,
+        default=1,
+        help="Split the output into this many separate files."
+    )
+
+    args = parser.parse_args()
+
+    # Convert gen_config string back to dict
+    try:
+        args.gen_config = json.loads(args.gen_config)
+    except json.JSONDecodeError:
+        logger.warn("Warning: --gen_config could not be parsed as JSON. Using default.")
+        args.gen_config = DEFAULT_GEN_CONFIG_ENTRY
+
+    return args
+
+if __name__ == "__main__":
+    print("Parsing CLI arguments...")
+    args = define_cli()
+
+    run_name = Path(args.output_file).stem
+    logg.logging_setup(run_name)
+    logger = logging.getLogger("data_preprocessing")
+
+    user_prompt = main._load_prompt_fromfile(args.user_prompt)
+    prompt_formatter = prompt_formatters.MCQPromptWoutSTSG(user_prompt)
+
+    dataset = STARDataset(
+        args.input_dataset,
+        prompt_formatter
+    )
+
+    if args.limit_n:
+        dataset = [dataset[i] for i in range(args.limit_n)]
+
+    if args.chunks > 1:
+        n_chunks = args.chunks
+
+        size = len(dataset)
+        chunk_size = int(size/n_chunks)
+        chunks = [
+            [dataset[j] for j in range(i*chunk_size, (i+1)*chunk_size)]
+            for i in range(n_chunks)
+        ]
+
+        if (rem := size % n_chunks) > 0:
+            start = chunk_size * n_chunks
+            end = start + rem # == len(dataset)
+            chunks[-1] += [dataset[i] for i in range(start, end)]
+
+        orig_file = Path(args.output_file)
+        for i, chunk in enumerate(chunks):
+            out_file = str(orig_file.with_stem(f"{orig_file.stem}_chunk_{i+1:02d}"))
+
+            logger.info(f"Chunk {i+1}")
+            batch(
+                star_dataset=chunk,
+                videos_dir=args.videos_dir,
+                fps=args.fps,
+                max_frames=args.max_frames,
+                out_filepath=out_file,
+        )
+    else:
+        batch(
+            star_dataset=dataset,
+            videos_dir=args.videos_dir,
+            fps=args.fps,
+            max_frames=args.max_frames,
+            out_filepath=args.output_file,
+        )
+
