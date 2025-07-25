@@ -19,6 +19,13 @@ logger = logging.getLogger("experiment")
 async def upload_run_batch(client, model, input_file,  api_key=None):
 
     fpath = Path(input_file).resolve()
+
+    # TODO: add check if file is already uploaded using the dispaly name
+    # if the file is already uploaded notify it with a log and skip the uploading
+    # TODO: Separate logi of file uploading, run batch and monitorin in different
+    # functions
+    # TODO: Add a ttl (Time To Leave) for files, Google charges for upload files,
+    # but it might be useful having file uploaded for a certain interval of time
     logger.info(f"Uploading {fpath}.")
 
     uploaded_file = await client.aio.files.upload(
@@ -42,30 +49,30 @@ async def upload_run_batch(client, model, input_file,  api_key=None):
 
     await monitor_batch(client, batch_job)
 
-    final_batch_job = await client.aio.batches.get(batch_job.name)
-    if final_batch_job and final_batch_job.state.name == "JOB_STATE_SUCCEDED":
-        output_uri = final_batch_job.result.output_file.uri
-        await download_result_file(client, output_uri)
+    final_batch_job = await client.aio.batches.get(name=batch_job.name)
+    if final_batch_job and final_batch_job.state == gtypes.JobState.JOB_STATE_SUCCEEDED:
+        await download_result_file(client, final_batch_job)
 
 
-async def download_result_file(client, output_uri, dest_folder="outputs"):
-    logger.info(f"Download result from: {output_uri}")
+async def download_result_file(client, batch_job, dest_folder="outputs"):
+    logger.info(f"Downloading results for: {batch_job.name}.")
     try:
         Path(dest_folder).mkdir(exist_ok=True)
 
-        result_file = await client.aio.files.get(name=output_uri)
+        result_file_name = batch_job.dest.file_name
+        result_file = await client.aio.files.download(file=result_file_name)
 
         # Construct the local save path
-        destination_path = Path(dest_folder) / Path(result_file.display_name).name
+        destination_path = Path(dest_folder) / f"{batch_job.display_name}.jsonl"
 
         # Write the file content to the local path
         with open(destination_path, "wb") as f:
-            f.write(result_file.read())
+            f.write(result_file)
 
         logger.info(f"Result saved to: {destination_path}")
         return destination_path
     except Exception as e:
-        logger.error(f"Failed to download {output_uri}. Error: {e}")
+        logger.error(f"Failed to download result for {batch_job.name}. Error: {e}")
         return None
 
 
@@ -75,26 +82,33 @@ async def monitor_batch(
     inital_wait=30,
     max_wait=1200 # 20min
 ):
-    completed_states = set([
-        'JOB_STATE_SUCCEEDED',
-        'JOB_STATE_FAILED',
-        'JOB_STATE_CANCELLED',
-    ])
+
+    completed_states = {
+        gtypes.JobState.JOB_STATE_SUCCEEDED,
+        gtypes.JobState.JOB_STATE_FAILED,
+        gtypes.JobState.JOB_STATE_CANCELLED,
+        gtypes.JobState.JOB_STATE_PAUSED,
+    }
 
     job_name = batch_job.name
     batch_job = await client.aio.batches.get(name=job_name) # Initial get
 
     current_wait = inital_wait
-    while batch_job.state.name not in completed_states:
-        logger.info(f"Current state: {batch_job.state.name}. Next check in: {current_wait}s")
+    while batch_job.state not in completed_states:
+        logger.info(f"Job: {batch_job.name} - Current state: {batch_job.state.name}. Next check in: {current_wait}s")
+        prev_state = batch_job.state
 
         await asyncio.sleep(current_wait) # Wait before polling again
 
-        batch_job = client.aio.batches.get(name=job_name) # Initial get
-        current_wait = min(current_wait*2, max_wait)
+        batch_job = await client.aio.batches.get(name=job_name) # Initial get
+        if batch_job.state == prev_state:
+            current_wait = min(current_wait*2, max_wait)
+        else:
+            # Resetting the waiting time when changing status state
+            current_wait = inital_wait
 
     logger.info(f"Job {job_name} finished with state: {batch_job.state.name}")
-    if batch_job.state.name == 'JOB_STATE_FAILED':
+    if batch_job.state == gtypes.JobState.JOB_STATE_FAILED:
         logger.error(f"Error: {batch_job.error}")
 
     return batch_job.state.name
@@ -133,7 +147,7 @@ async def main(model_name, *input_files):
     ]
 
     # Execute all tasks concurrently, allowing individual failures
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks) #, return_exceptions=True)
 
     # Log results
     success_count = 0
