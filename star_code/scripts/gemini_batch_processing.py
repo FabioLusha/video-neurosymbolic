@@ -1,27 +1,28 @@
 import asyncio
+import json
 import logging
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, List
 
+import pandas as pd
 from google.genai import types as gtypes
 
 SRC_DIR = str(Path(__file__).resolve().parent.parent)
 sys.path.append(str(SRC_DIR))
 
-from src.utils import gemini_utils, logg
+from src.utils import logg
 
 logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")
 logger = logging.getLogger("experiment")
 
 
-async def upload_file(client, input_file):
+async def upload_file(client, input_file: str):
     fpath = Path(input_file).resolve()
 
     # TODO: add check if file is already uploaded using the dispaly name
     # if the file is already uploaded notify it with a log and skip the uploading
-    # TODO: Separate logi of file uploading, run batch and monitorin in different
-    # functions
     # TODO: Add a ttl (Time To Leave) for files, Google charges for upload files,
     # but it might be useful having file uploaded for a certain interval of time
     logger.info(f"Uploading {fpath}.")
@@ -108,13 +109,13 @@ async def download_result_file(client, batch_job, dest_folder=None):
             f.write(result_file)
 
         logger.info(f"Result saved to: {destination_path}")
-        return destination_path
+        return str(destination_path)
     except Exception as e:
         logger.error(f"Failed to download result for {batch_job.name}. Error: {e}")
-        return None
+        raise e
 
 
-async def run_batch_job(client, input_file, model, dest_folder=None):
+async def run_batch_job(client, input_file: str, model, dest_folder=None):
     remote_batch_file = await upload_file(client, input_file)
     batch_job = await create_batch_job(client, remote_batch_file, model)
     result_state = await monitor_batch_job(client, batch_job)
@@ -122,12 +123,58 @@ async def run_batch_job(client, input_file, model, dest_folder=None):
     if result_state == gtypes.JobState.JOB_STATE_SUCCEEDED:
         # refreshing batch_obj reference
         final_batch_job = await client.aio.batches.get(name=batch_job.name)
-        await download_result_file(client, final_batch_job)
+        result_filepath = await download_result_file(
+            client, final_batch_job, dest_folder
+        )
+    else:
+        logger.error(
+            f"Batch job {batch_job.name} failed with state: {result_state.name}"
+        )
+        raise Exception(f"The Batch process failes with state: {result_state.name}")
 
-    return
+    return (input_file, result_filepath)
 
 
-async def main(model_name, *input_files):
+async def append_response_to_query(input_batch, response_batch):
+    query_data_df = pd.DataFrame(input_batch)
+    response_data_df = pd.DataFrame(response_batch)
+
+    # Gemini can return multiple candidates for a question
+    # the content of a candidate contains the 'Content' for the response
+    # with the role and parts of the response
+    response_data_df["response_content"] = response_data_df["response"].apply(
+        lambda x: x["candidates"][0]["content"]
+    )
+
+    # Filter out responses with empty text
+    response_data_df = response_data_df[
+        response_data_df["response_content"].apply(
+            lambda x: x["parts"][0]["text"] != ""
+        )
+    ]
+
+    new_batch = query_data_df.merge(response_data_df, on="key", how="inner").to_dict(
+        orient="records"
+    )
+    for request in new_batch:
+        request["request"]["contents"].append(request.pop("response_content"))
+
+    return new_batch
+
+
+async def append_default_reply(input_batch: List[Dict], reply_filepath):
+    with open(reply_filepath, "r") as f:
+        reply = f.read()
+
+    for request in input_batch:
+        request["request"]["contents"].append(
+            {"role": "user", "parts": [{"text": reply}]}
+        )
+
+    return input_batch
+
+
+async def batch_processor(client, model_name, *input_files):
     """
     Run batch processing for multiple input files in parallel.
 
@@ -137,7 +184,7 @@ async def main(model_name, *input_files):
     """
     if not input_files:
         logger.error("No input files provided")
-        return
+        return []
 
     # Validate input files exist
     valid_files = []
@@ -149,9 +196,8 @@ async def main(model_name, *input_files):
 
     if not valid_files:
         logger.error("No valid input files found")
-        return
-    # Initialize client (assuming this is defined elsewhere in your code)
-    client = gemini_utils.get_client()  # Replace with your client setup
+        return []
+
     logger.info(
         f"Starting parallel batch processing for {len(valid_files)} files with model: {model_name}"
     )
@@ -162,13 +208,13 @@ async def main(model_name, *input_files):
     ]
 
     # Execute all tasks concurrently, allowing individual failures
-    results = await asyncio.gather(*tasks)  # , return_exceptions=True)
+    in_out_files = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Log results
     success_count = 0
-    for i, result in enumerate(results):
+    for i, result in enumerate(in_out_files):
         if isinstance(result, Exception):
-            logger.error(f"Batch processing failed for {valid_files[i]}: {result}")
+            logger.error(f"Batch processing failed for {valid_files[i]}: {result}!")
         else:
             success_count += 1
             logger.info(f"Batch processing completed for {valid_files[i]}")
@@ -176,6 +222,42 @@ async def main(model_name, *input_files):
     logger.info(
         f"Batch processing summary: {success_count}/{len(valid_files)} successful"
     )
+
+    return in_out_files
+
+
+async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_files):
+    # first question
+    in_out_files = await batch_processor(client, model_name, *input_files)
+
+    new_batch_paths = []
+    for i, result in enumerate(in_out_files):
+        if isinstance(result, Exception):
+            logger.warning(
+                f"The batch job for {input_files[i]} failed. Skipping this chunk"
+            )
+            continue
+
+        else:
+            input_fpath = Path(result[0])
+            response_fpath = Path(result[1])
+            with input_fpath.open("r") as f:
+                input_batch = [json.loads(line) for line in f.readlines()]
+            with response_fpath.open("r") as f:
+                out_batch = [json.loads(line) for line in f.readlines()]
+
+            new_batch = await append_response_to_query(input_batch, out_batch)
+            new_batch = await append_default_reply(new_batch, reply_file)
+
+            out_fpath = input_fpath.with_stem(f"{input_fpath.stem}_2nd")
+            with out_fpath.open("w") as f:
+                for entry in new_batch:
+                    f.write(json.dumps(entry) + "\n")
+
+            new_batch_paths.append(str(out_fpath))
+
+    await batch_processor(client, model_name, *new_batch_paths)
+    return
 
 
 if __name__ == "__main__":
