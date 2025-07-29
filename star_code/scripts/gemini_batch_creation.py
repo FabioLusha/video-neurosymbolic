@@ -59,13 +59,12 @@ from src import (
 #   "mediaResolution": enum (MediaResolution)
 # }
 DEFAULT_GEN_CONFIG_ENTRY = {
-"generationConfig": {
     "thinkingConfig": {
-        "thinkingBudget": 0 # Disable thinking
+        "thinkingBudget": 0, # Disable thinking
+        "includeThoughts": True, # For troublehshooting
     },
-    "maxOutputTokens": 2048,
+    "maxOutputTokens": 1024,
     "seed": 6,
-}
 }
 
 
@@ -84,11 +83,11 @@ def vqa_format(
                 "parts": [{"text": text}] + \
                     [{"inline_data": {"mime_type": "image/png", "data": b64_enc}}
                     for b64_enc in b64images], 
-            }]
+            }],
+            "generationConfig": gen_config
         }
     }
 
-    format.update(gen_config)
     # TODO: Add safety settings if needed
     return format
 
