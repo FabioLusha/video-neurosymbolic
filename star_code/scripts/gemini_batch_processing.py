@@ -1,8 +1,7 @@
-import sys
 import asyncio
-from datetime import datetime
-
 import logging
+import sys
+from datetime import datetime
 from pathlib import Path
 
 from google.genai import types as gtypes
@@ -10,14 +9,13 @@ from google.genai import types as gtypes
 SRC_DIR = str(Path(__file__).resolve().parent.parent)
 sys.path.append(str(SRC_DIR))
 
-from src.utils import logg, gemini_utils
-
+from src.utils import gemini_utils, logg
 
 logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")
 logger = logging.getLogger("experiment")
 
-async def upload_run_batch(client, model, input_file,  api_key=None):
 
+async def upload_file(client, input_file):
     fpath = Path(input_file).resolve()
 
     # TODO: add check if file is already uploaded using the dispaly name
@@ -31,30 +29,70 @@ async def upload_run_batch(client, model, input_file,  api_key=None):
     uploaded_file = await client.aio.files.upload(
         file=str(fpath),
         config=gtypes.UploadFileConfig(
-            display_name=f"batch-{fpath.stem}",
-            mime_type="jsonl"
-        )
+            display_name=f"batch-{fpath.stem}", mime_type="jsonl"
+        ),
     )
 
     logger.info(f"{fpath.stem} uploaded: {uploaded_file.name}")
 
+    return uploaded_file
+
+
+async def create_batch_job(client, model, remote_file):
     batch_job = await client.aio.batches.create(
         model=model,
-        src=uploaded_file.name,
+        src=remote_file.name,
         config={
-            'display_name': f"batch-job-{fpath.stem}",
+            "display_name": f"batch-job-{remote_file.stem}",
         },
     )
     logger.info(f"Batch job created: {batch_job.name}")
 
-    await monitor_batch(client, batch_job)
-
-    final_batch_job = await client.aio.batches.get(name=batch_job.name)
-    if final_batch_job and final_batch_job.state == gtypes.JobState.JOB_STATE_SUCCEEDED:
-        await download_result_file(client, final_batch_job)
+    return batch_job
 
 
-async def download_result_file(client, batch_job, dest_folder="outputs"):
+async def monitor_batch_job(
+    client,
+    batch_job,
+    initial_wait=30,
+    max_wait=1200,  # 20min
+):
+    completed_states = {
+        gtypes.JobState.JOB_STATE_SUCCEEDED,
+        gtypes.JobState.JOB_STATE_FAILED,
+        gtypes.JobState.JOB_STATE_CANCELLED,
+        gtypes.JobState.JOB_STATE_PAUSED,
+    }
+
+    job_name = batch_job.name
+    batch_job = await client.aio.batches.get(name=job_name)  # Initial get
+
+    current_wait = initial_wait
+    while batch_job.state not in completed_states:
+        logger.info(
+            f"Job: {batch_job.name} - Current state: {batch_job.state.name}. Next check in: {current_wait}s"
+        )
+        prev_state = batch_job.state
+
+        await asyncio.sleep(current_wait)  # Wait before polling again
+
+        batch_job = await client.aio.batches.get(name=job_name)  # Initial get
+        if batch_job.state == prev_state:
+            current_wait = min(current_wait * 2, max_wait)
+        else:
+            # Resetting the waiting time when changing status state
+            current_wait = initial_wait
+
+    logger.info(f"Job {job_name} finished with state: {batch_job.state.name}")
+    if batch_job.state == gtypes.JobState.JOB_STATE_FAILED:
+        logger.error(f"Error: {batch_job.error}")
+
+    return batch_job.state
+
+
+async def download_result_file(client, batch_job, dest_folder=None):
+    dest_folder = dest_folder or "outputs"
+
     logger.info(f"Downloading results for: {batch_job.name}.")
     try:
         Path(dest_folder).mkdir(exist_ok=True)
@@ -76,42 +114,18 @@ async def download_result_file(client, batch_job, dest_folder="outputs"):
         return None
 
 
-async def monitor_batch(
-    client,
-    batch_job,
-    inital_wait=30,
-    max_wait=1200 # 20min
-):
+async def run_batch_job(client, input_file, model, dest_folder=None):
+    remote_batch_file = await upload_file(client, input_file)
+    batch_job = await create_batch_job(client, remote_batch_file, model)
+    result_state = await monitor_batch_job(client, batch_job)
 
-    completed_states = {
-        gtypes.JobState.JOB_STATE_SUCCEEDED,
-        gtypes.JobState.JOB_STATE_FAILED,
-        gtypes.JobState.JOB_STATE_CANCELLED,
-        gtypes.JobState.JOB_STATE_PAUSED,
-    }
+    if result_state == gtypes.JobState.JOB_STATE_SUCCEEDED:
+        # refreshing batch_obj reference
+        final_batch_job = await client.aio.batches.get(name=batch_job.name)
+        await download_result_file(client, final_batch_job)
 
-    job_name = batch_job.name
-    batch_job = await client.aio.batches.get(name=job_name) # Initial get
+    return
 
-    current_wait = inital_wait
-    while batch_job.state not in completed_states:
-        logger.info(f"Job: {batch_job.name} - Current state: {batch_job.state.name}. Next check in: {current_wait}s")
-        prev_state = batch_job.state
-
-        await asyncio.sleep(current_wait) # Wait before polling again
-
-        batch_job = await client.aio.batches.get(name=job_name) # Initial get
-        if batch_job.state == prev_state:
-            current_wait = min(current_wait*2, max_wait)
-        else:
-            # Resetting the waiting time when changing status state
-            current_wait = inital_wait
-
-    logger.info(f"Job {job_name} finished with state: {batch_job.state.name}")
-    if batch_job.state == gtypes.JobState.JOB_STATE_FAILED:
-        logger.error(f"Error: {batch_job.error}")
-
-    return batch_job.state.name
 
 async def main(model_name, *input_files):
     """
@@ -138,16 +152,17 @@ async def main(model_name, *input_files):
         return
     # Initialize client (assuming this is defined elsewhere in your code)
     client = gemini_utils.get_client()  # Replace with your client setup
-    logger.info(f"Starting parallel batch processing for {len(valid_files)} files with model: {model_name}")
+    logger.info(
+        f"Starting parallel batch processing for {len(valid_files)} files with model: {model_name}"
+    )
 
     # Run all batch uploads in parallel
     tasks = [
-        upload_run_batch(client, model_name, input_file) 
-        for input_file in valid_files
+        run_batch_job(client, input_file, model_name) for input_file in valid_files
     ]
 
     # Execute all tasks concurrently, allowing individual failures
-    results = await asyncio.gather(*tasks) #, return_exceptions=True)
+    results = await asyncio.gather(*tasks)  # , return_exceptions=True)
 
     # Log results
     success_count = 0
@@ -158,7 +173,10 @@ async def main(model_name, *input_files):
             success_count += 1
             logger.info(f"Batch processing completed for {valid_files[i]}")
 
-    logger.info(f"Batch processing summary: {success_count}/{len(valid_files)} successful")
+    logger.info(
+        f"Batch processing summary: {success_count}/{len(valid_files)} successful"
+    )
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

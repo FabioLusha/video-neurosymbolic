@@ -2,6 +2,7 @@ re
 requests
 responses
 datetime
+google-generativeai
 
 pandas
 numpy
