@@ -271,18 +271,18 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
             new_batch_paths.append(str(out_fpath))
 
     final_results = await batch_processor(client, model_name, *new_batch_paths)
-    # Create a file with all teh parts to infer the chat_history
 
+    # Create a file with all teh parts to infer the chat_history
     final_paths = []
     for i, result in enumerate(final_results):
         if isinstance(result, Exception):
             logger.warning(
-                f"The batch job for {input_files[i]} failed. Skipping this chunk"
+                f"The batch job for {new_batch_paths[i]} failed. Skipping this chunk"
             )
             continue
 
         else:
-            input_fpath = Path(input_files[i])
+            input_fpath = Path(new_batch_paths[i])
             response_fpath = Path(result)
             with input_fpath.open("r") as f:
                 input_batch = [json.loads(line) for line in f.readlines()]
