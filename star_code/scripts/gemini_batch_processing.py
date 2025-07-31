@@ -14,14 +14,13 @@ sys.path.append(str(SRC_DIR))
 
 from src.utils import logg
 
-logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")
 logger = logging.getLogger("experiment")
 
 
 async def upload_file(client, input_file: str):
     fpath = Path(input_file).resolve()
 
-    # TODO: add check if file is already uploaded using the dispaly name
+    # TODO: add check if file is already uploaded using the display name
     # if the file is already uploaded notify it with a log and skip the uploading
     # TODO: Add a ttl (Time To Leave) for files, Google charges for upload files,
     # but it might be useful having file uploaded for a certain interval of time
@@ -44,7 +43,7 @@ async def create_batch_job(client, model, remote_file):
         model=model,
         src=remote_file.name,
         config={
-            "display_name": f"batch-job-{remote_file.stem}",
+            "display_name": f"batch-job-{remote_file.display_name}",
         },
     )
     logger.info(f"Batch job created: {batch_job.name}")
@@ -96,15 +95,23 @@ async def download_result_file(client, batch_job, dest_folder=None):
 
     logger.info(f"Downloading results for: {batch_job.name}.")
     try:
-        Path(dest_folder).mkdir(exist_ok=True)
-
         result_file_name = batch_job.dest.file_name
         result_file = await client.aio.files.download(file=result_file_name)
 
-        # Construct the local save path
-        destination_path = Path(dest_folder) / f"{batch_job.display_name}.jsonl"
+        destination_path = Path(dest_folder, f"{batch_job.display_name}.jsonl")
 
-        # Write the file content to the local path
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        # Check if the dest_file exist, if it exist create new name
+        copy_counter = 0
+        base = destination_path.stem
+        while destination_path.exists():
+            copy_counter += 1
+            new_path = destination_path.with_stem(f"{base}_copy{copy_counter}")
+            logger.warning(
+                f"{destination_path.name} already exists! Saving in {new_path.name}."
+            )
+            destination_path = new_path
+
         with open(destination_path, "wb") as f:
             f.write(result_file)
 
@@ -117,7 +124,7 @@ async def download_result_file(client, batch_job, dest_folder=None):
 
 async def run_batch_job(client, input_file: str, model, dest_folder=None):
     remote_batch_file = await upload_file(client, input_file)
-    batch_job = await create_batch_job(client, remote_batch_file, model)
+    batch_job = await create_batch_job(client, model, remote_batch_file)
     result_state = await monitor_batch_job(client, batch_job)
 
     if result_state == gtypes.JobState.JOB_STATE_SUCCEEDED:
@@ -130,9 +137,9 @@ async def run_batch_job(client, input_file: str, model, dest_folder=None):
         logger.error(
             f"Batch job {batch_job.name} failed with state: {result_state.name}"
         )
-        raise Exception(f"The Batch process failes with state: {result_state.name}")
+        raise Exception(f"The Batch process fails with state: {result_state.name}")
 
-    return (input_file, result_filepath)
+    return result_filepath
 
 
 async def append_response_to_query(input_batch, response_batch):
@@ -142,14 +149,21 @@ async def append_response_to_query(input_batch, response_batch):
     # Gemini can return multiple candidates for a question
     # the content of a candidate contains the 'Content' for the response
     # with the role and parts of the response
+    #
     response_data_df["response_content"] = response_data_df["response"].apply(
+        # We need to make some existence cheks because the anser the result response
+        # may fail for different reasons (i.e. Blocked becuse of "safety settings"
         lambda x: x["candidates"][0]["content"]
+        if "candidates" in x.keys()
+        and x["candidates"]  # check the existence of the list
+        and "content" in x["candidates"][0].keys()
+        else None
     )
 
     # Filter out responses with empty text
     response_data_df = response_data_df[
         response_data_df["response_content"].apply(
-            lambda x: x["parts"][0]["text"] != ""
+            lambda x: (x is not None) and (x["parts"][0]["text"] != "")
         )
     ]
 
@@ -208,11 +222,11 @@ async def batch_processor(client, model_name, *input_files):
     ]
 
     # Execute all tasks concurrently, allowing individual failures
-    in_out_files = await asyncio.gather(*tasks, return_exceptions=True)
+    out_files = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Log results
     success_count = 0
-    for i, result in enumerate(in_out_files):
+    for i, result in enumerate(out_files):
         if isinstance(result, Exception):
             logger.error(f"Batch processing failed for {valid_files[i]}: {result}!")
         else:
@@ -223,15 +237,15 @@ async def batch_processor(client, model_name, *input_files):
         f"Batch processing summary: {success_count}/{len(valid_files)} successful"
     )
 
-    return in_out_files
+    return out_files
 
 
 async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_files):
     # first question
-    in_out_files = await batch_processor(client, model_name, *input_files)
+    out_files = await batch_processor(client, model_name, *input_files)
 
     new_batch_paths = []
-    for i, result in enumerate(in_out_files):
+    for i, result in enumerate(out_files):
         if isinstance(result, Exception):
             logger.warning(
                 f"The batch job for {input_files[i]} failed. Skipping this chunk"
@@ -239,8 +253,8 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
             continue
 
         else:
-            input_fpath = Path(result[0])
-            response_fpath = Path(result[1])
+            input_fpath = Path(input_files[i])
+            response_fpath = Path(result)
             with input_fpath.open("r") as f:
                 input_batch = [json.loads(line) for line in f.readlines()]
             with response_fpath.open("r") as f:
@@ -256,16 +270,9 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
 
             new_batch_paths.append(str(out_fpath))
 
-    await batch_processor(client, model_name, *new_batch_paths)
-    return
+    final_results = await batch_processor(client, model_name, *new_batch_paths)
+    return final_results
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python script.py <model_name> <input_file1> [input_file2] [...]")
-        sys.exit(1)
-
-    model_name = sys.argv[1]
-    input_files = sys.argv[2:]
-
-    asyncio.run(main(model_name, *input_files))
+    logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")

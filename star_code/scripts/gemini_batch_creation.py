@@ -1,22 +1,21 @@
+import argparse
+import base64
 import json
+import logging
 import sys
 from pathlib import Path
-import base64
-import argparse
-import logging
-
 
 SRC_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(SRC_DIR))
 
-from src.utils import logg
-from src.datasets import STARDataset
 from src import (
-    video_tools,
     prompt_formatters,
-    main,
+    video_tools,
 )
+from src.datasets import STARDataset
+from src.utils import logg
 
+logger = logging.getLogger("data_preprocessing")
 # If you need to disable safety settings
 # SAFETY_SETTINGS = {
 #     "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
@@ -60,40 +59,46 @@ from src import (
 # }
 DEFAULT_GEN_CONFIG_ENTRY = {
     "thinkingConfig": {
-        "thinkingBudget": 0, # Disable thinking
-        "includeThoughts": True, # For troublehshooting
+        "thinkingBudget": 0,  # Disable thinking
+        "includeThoughts": True,  # For troublehshooting
     },
     "maxOutputTokens": 1024,
     "seed": 6,
 }
 
 
-def vqa_format(
-    key,
-    text,
-    b64images,
-    gen_config=DEFAULT_GEN_CONFIG_ENTRY,
-    safety_settings=None
-):
+def vqa_format(key, text, b64images, gen_config=None, safety_settings=None):
+    gen_config = gen_config or DEFAULT_GEN_CONFIG_ENTRY
     format = {
         "key": key,
         "request": {
-            "contents": [{
-                "role": "user",
-                "parts": [{"text": text}] + \
-                    [{"inline_data": {"mime_type": "image/png", "data": b64_enc}}
-                    for b64_enc in b64images], 
-            }],
-            "generationConfig": gen_config
-        }
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": text}]
+                    + [
+                        {"inline_data": {"mime_type": "image/png", "data": b64_enc}}
+                        for b64_enc in b64images
+                    ],
+                }
+            ],
+            "generationConfig": gen_config,
+        },
     }
 
     # TODO: Add safety settings if needed
     return format
 
-def batch(star_dataset, videos_dir, fps, max_frames, out_filepath, gen_config=DEFAULT_GEN_CONFIG_ENTRY, limit_n=None):
 
-
+def batch(
+    star_dataset,
+    videos_dir,
+    fps,
+    max_frames,
+    out_filepath,
+    gen_config=DEFAULT_GEN_CONFIG_ENTRY,
+    limit_n=None,
+):
     out_filepath = Path(out_filepath)
     if out_filepath.exists():
         logger.info(f"File {out_filepath} already exists! Not writing")
@@ -106,13 +111,12 @@ def batch(star_dataset, videos_dir, fps, max_frames, out_filepath, gen_config=DE
         sample = star_dataset[i]
 
         _, frame_paths = video_tools.extract_frames(
-            video_path = f"{videos_dir}/{sample['video_id']}.mp4",
-            start_time = float(sample['start']),
-            end_time   = float(sample['end']),
-            fps        = fps,
-            max_frames = max_frames,
+            video_path=f"{videos_dir}/{sample['video_id']}.mp4",
+            start_time=float(sample["start"]),
+            end_time=float(sample["end"]),
+            fps=fps,
+            max_frames=max_frames,
         )
-
 
         b64encodings = []
         for fpath in frame_paths:
@@ -121,17 +125,87 @@ def batch(star_dataset, videos_dir, fps, max_frames, out_filepath, gen_config=DE
                 b64encodings.append(enc)
 
         generate_content_request = vqa_format(
-            key        = sample['question_id'],
-            text       = sample['prompt'],
-            b64images  = b64encodings,
-            gen_config = gen_config,
+            key=sample["question_id"],
+            text=sample["prompt"],
+            b64images=b64encodings,
+            gen_config=gen_config,
         )
 
-        with open(out_filepath, 'a') as out:
+        with open(out_filepath, "a") as out:
             line = json.dumps(generate_content_request) + "\n"
             out.write(line)
 
     return
+
+
+def preprocess_dataset_to_request(
+    input_dataset_path,
+    user_prompt_path,
+    videos_dir,
+    fps,
+    max_frames,
+    output_file_path,
+    gen_config=None,
+    limit_n=None,
+    n_chunks=1,
+):
+    with open(user_prompt_path, "r") as f:
+        user_prompt_text = f.read()
+
+    prompt_formatter = prompt_formatters.MCQPromptWoutSTSG(user_prompt_text)
+
+    dataset = STARDataset(input_dataset_path, prompt_formatter)
+
+    if limit_n:
+        dataset = [dataset[i] for i in range(limit_n)]
+
+    size = len(dataset)
+    if size == 0:
+        logger.warning("Dataset is empty. No files will be written.")
+        raise IndexError("The Dataset is empty")
+
+    if n_chunks > 1:
+        chunk_size = int(size / n_chunks)
+        chunks = [
+            [dataset[j] for j in range(i * chunk_size, (i + 1) * chunk_size)]
+            for i in range(n_chunks)
+        ]
+
+        if (rem := size % n_chunks) > 0:
+            start = chunk_size * n_chunks
+            end = start + rem  # == len(dataset)
+            chunks[-1] += [dataset[i] for i in range(start, end)]
+
+        orig_file = Path(output_file_path)
+        out_files = []
+        for i, chunk in enumerate(chunks):
+            out_file = str(orig_file.with_stem(f"{orig_file.stem}_chunk_{i + 1:02d}"))
+
+            logger.info(f"Chunk {i + 1}")
+            batch(
+                star_dataset=chunk,
+                videos_dir=videos_dir,
+                fps=fps,
+                max_frames=max_frames,
+                out_filepath=out_file,
+                gen_config=gen_config,
+            )
+
+            out_files.append(out_file)
+
+        return out_files
+    else:
+        batch(
+            star_dataset=dataset,
+            videos_dir=videos_dir,
+            fps=fps,
+            max_frames=max_frames,
+            out_filepath=output_file_path,
+            gen_config=gen_config,
+        )
+
+        return [output_file_path]
+
 
 def define_cli():
     """
@@ -145,10 +219,7 @@ def define_cli():
     )
 
     parser.add_argument(
-        "--input-dataset",
-        type=str,
-        required=True,
-        help="Path to the STAR dataset."
+        "--input-dataset", type=str, required=True, help="Path to the STAR dataset."
     )
     parser.add_argument(
         "--user-prompt",
@@ -159,56 +230,74 @@ def define_cli():
         "--videos-dir",
         type=str,
         required=True,
-        help="Directory containing the video files."
+        help="Directory containing the video files.",
     )
     parser.add_argument(
         "--fps",
         type=int,
         required=True,
-        help="Frames per second to extract from videos."
+        help="Frames per second to extract from videos.",
     )
     parser.add_argument(
         "--max-frames",
         type=int,
         required=True,
-        help="Maximum number of frames to extract."
+        help="Maximum number of frames to extract.",
     )
     parser.add_argument(
         "--output-file",
         type=str,
         required=True,
-        help="Path to the output file where VQA requests will be written."
+        help="Path to the output file where VQA requests will be written.",
     )
     parser.add_argument(
         "--gen-config",
         type=str,
-        default=json.dumps(DEFAULT_GEN_CONFIG_ENTRY),
+        default=None,
         help=f"JSON string of generation configuration (e.g., '{{\"temperature\": 0.7}}'). "
-             f"Defaults to {json.dumps(DEFAULT_GEN_CONFIG_ENTRY)}."
+        f"Defaults to {json.dumps(DEFAULT_GEN_CONFIG_ENTRY)}.",
     )
     parser.add_argument(
         "--limit-n",
         type=int,
         default=None,
-        help="Limit the number of samples to process from the dataset (first n)."
+        help="Limit the number of samples to process from the dataset (first n).",
     )
     parser.add_argument(
         "--chunks",
         type=int,
         default=1,
-        help="Split the output into this many separate files."
+        help="Split the output into this many separate files.",
     )
 
     args = parser.parse_args()
-
-    # Convert gen_config string back to dict
-    try:
-        args.gen_config = json.loads(args.gen_config)
-    except json.JSONDecodeError:
-        logger.warn("Warning: --gen_config could not be parsed as JSON. Using default.")
-        args.gen_config = DEFAULT_GEN_CONFIG_ENTRY
-
     return args
+
+
+def main(args):
+    # Convert gen_config string back to dict
+    gen_config = None
+    if args.gen_config:
+        try:
+            with open(args.gen_config, "r") as f:
+                gen_config = json.load(f)
+        except json.JSONDecodeError:
+            logger.warning(
+                "Warning: --gen-config could not be parsed as JSON. Using default."
+            )
+
+    return preprocess_dataset_to_request(
+        input_dataset_path=args.input_dataset,
+        user_prompt_path=args.user_prompt,
+        videos_dir=args.videos_dir,
+        fps=args.fps,
+        max_frames=args.max_frames,
+        output_file_path=args.output_file,
+        limit_n=args.limit_n,
+        n_chunks=args.chunks,
+        gen_config=gen_config,
+    )
+
 
 if __name__ == "__main__":
     print("Parsing CLI arguments...")
@@ -216,52 +305,5 @@ if __name__ == "__main__":
 
     run_name = Path(args.output_file).stem
     logg.logging_setup(run_name)
-    logger = logging.getLogger("data_preprocessing")
 
-    user_prompt = main._load_prompt_fromfile(args.user_prompt)
-    prompt_formatter = prompt_formatters.MCQPromptWoutSTSG(user_prompt)
-
-    dataset = STARDataset(
-        args.input_dataset,
-        prompt_formatter
-    )
-
-    if args.limit_n:
-        dataset = [dataset[i] for i in range(args.limit_n)]
-
-    if args.chunks > 1:
-        n_chunks = args.chunks
-
-        size = len(dataset)
-        chunk_size = int(size/n_chunks)
-        chunks = [
-            [dataset[j] for j in range(i*chunk_size, (i+1)*chunk_size)]
-            for i in range(n_chunks)
-        ]
-
-        if (rem := size % n_chunks) > 0:
-            start = chunk_size * n_chunks
-            end = start + rem # == len(dataset)
-            chunks[-1] += [dataset[i] for i in range(start, end)]
-
-        orig_file = Path(args.output_file)
-        for i, chunk in enumerate(chunks):
-            out_file = str(orig_file.with_stem(f"{orig_file.stem}_chunk_{i+1:02d}"))
-
-            logger.info(f"Chunk {i+1}")
-            batch(
-                star_dataset=chunk,
-                videos_dir=args.videos_dir,
-                fps=args.fps,
-                max_frames=args.max_frames,
-                out_filepath=out_file,
-        )
-    else:
-        batch(
-            star_dataset=dataset,
-            videos_dir=args.videos_dir,
-            fps=args.fps,
-            max_frames=args.max_frames,
-            out_filepath=args.output_file,
-        )
-
+    main(args)
