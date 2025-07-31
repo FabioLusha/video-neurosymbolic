@@ -9,11 +9,6 @@ from typing import Dict, List
 import pandas as pd
 from google.genai import types as gtypes
 
-SRC_DIR = str(Path(__file__).resolve().parent.parent)
-sys.path.append(str(SRC_DIR))
-
-from src.utils import logg
-
 logger = logging.getLogger("experiment")
 
 
@@ -302,4 +297,8 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
 
 
 if __name__ == "__main__":
+    SRC_DIR = str(Path(__file__).resolve().parent.parent)
+    sys.path.append(str(SRC_DIR))
+    from src.utils import logg
+
     logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")

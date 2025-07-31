@@ -1,23 +1,40 @@
 import asyncio
 import sys
+import json
 from pathlib import Path
+import logging
 
 import gemini_batch_creation
 import gemini_batch_processing
 
+logger = logging.getLogger("experiment")
 
 def main(client):
+    # task = "vqa"
+    #
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    # limit_n = 200
+    # n_chunks = 4
+    # user_prompt = "../data/prompts/vqa/user_prompt.txt"
+    # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+    # fps = 1
+    # max_frames = 64
+    # output_file = "../scripts/data/vqa_gemini_flash.jsonl"
+
+    task = "sgg"
+
     input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
     limit_n = 200
     n_chunks = 4
-    user_prompt = "../data/prompts/vqa/user_prompt.txt"
+    user_prompt = "../data/prompts/graph-gen/user_prompt_v2_gemini.txt"
     videos_dir = "../data/datasets/action-genome/Charades_v1_480"
     fps = 1
     max_frames = 64
-    output_file = "../scripts/data/vqa_gemini_flash.jsonl"
+    output_file = "../scripts/data/sgg_200.jsonl"
 
     chunks_filenames = gemini_batch_creation.preprocess_dataset_to_request(
         input_dataset_path=input_dataset,
+        task=task,
         user_prompt_path=user_prompt,
         videos_dir=videos_dir,
         fps=fps,
@@ -27,7 +44,10 @@ def main(client):
         n_chunks=n_chunks,
     )
 
-    reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+    # vqa or graph-understanding
+    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+    # sgg
+    reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
     model_name = "gemini-2.5-flash"
     results = asyncio.run(
         gemini_batch_processing.zero_shot_cot_batch_pipeline(
@@ -37,6 +57,34 @@ def main(client):
             *chunks_filenames,
         )
     )
+
+    logger.info("Aggregating chunked results.")
+    concat = []
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+
+        with open(result, "r") as f:
+            concat += [json.loads(line) for line in f.readlines()]
+
+    if task == "sgg":
+        filtered_entries = []
+        for entry in concat:
+            entry["question_id"] = entry["key"]
+            try:
+                entry["stsg"] = entry["request"]["contents"][-1]["parts"][0]["text"]
+                filtered_entries.append(entry)
+            except Exception:
+                continue
+        concat = filtered_entries
+
+    out_path = Path(output_file)
+    agg_filepath = out_path.with_stem(f"aggregated_final_{out_path.stem}")
+    with agg_filepath.open("w") as f:
+        for entry in concat:
+            f.write(json.dumps(entry) + "\n")
+
+    logger.info(f"Aggregated file saved in {str(agg_filepath)}")
 
     return
 
