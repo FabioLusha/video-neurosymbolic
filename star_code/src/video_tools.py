@@ -51,6 +51,9 @@ def extract_frames(
         output_dir: Directory to save frames (optional)
         start_time: Start time in seconds (default: 0)
         end_time: End time in seconds (default: None, meaning end of video)
+    Return:
+        output_dir: Directory where the extracted frames are saved
+        frame_paths: Ordered list of the file paths of the extracted frames
     """
 
     # hardcoded lower bound for fps
