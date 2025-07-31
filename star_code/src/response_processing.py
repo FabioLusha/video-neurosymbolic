@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Callable
@@ -6,18 +7,21 @@ from typing import Callable
 import pandas as pd
 from deprecated import deprecated
 
+logger = logging.getLogger("data_preprocessing")
+
 MODEL_PREPROCESSING: dict[str, Callable] = {}
+FILE_PREPARATION: dict[str, Callable] = {}  # Framework {ollama, gemini} -> function
 
 
-def register_model(name: str):
+def register(name: str, container: dict[str, Callable]):
     def decorator(fn: Callable):
-        MODEL_PREPROCESSING[name] = fn
+        container[name] = fn
         return fn
 
     return decorator
 
 
-@register_model("gemma3")
+@register("gemma3", MODEL_PREPROCESSING)
 def gemma3_preprocessing(predictions_df):
     # For Gemma we need to be more careful becuase the format is different, it encapsulated the json output in the with the tokens:
     # ```
@@ -26,8 +30,8 @@ def gemma3_preprocessing(predictions_df):
     # \n```
     # ```
 
-    json_pattern = r"^(?:```json\s)?({[^}]+})(?:\s```)?"
-    json_mask = predictions_df["answer"].str.match(json_pattern)
+    json_pattern = r"^\s*(?:```json\s)?({[^}]+})(?:\s```)?"
+    json_mask = predictions_df["answer"].str.match(json_pattern, flags=re.DOTALL)
     predictions_df["json_mask"] = json_mask
     matches_json_template = json_mask.sum()
 
@@ -75,7 +79,7 @@ def gemma3_preprocessing(predictions_df):
     return predictions_df
 
 
-@register_model("qwen2.5vl")
+@register("qwen2.5vl", MODEL_PREPROCESSING)
 def qwen25_preprocessing(predictions_df):
     json_pattern = r"^(?:```json\s)?({[^}]+})(?:\s*```)?"
     json_mask = predictions_df["answer"].str.match(json_pattern)
@@ -96,7 +100,8 @@ def qwen25_preprocessing(predictions_df):
     return predictions_df
 
 
-def ans_extract(input_filepath, model):
+@register("ollama", FILE_PREPARATION)
+def ollama_file_prepartion(input_filepath):
     input_filepath = Path(input_filepath)
 
     predictions = []
@@ -108,12 +113,47 @@ def ans_extract(input_filepath, model):
         columns={"qid": "id", "response": "answer"}
     )
 
-    predictions_df = predictions_df.drop_duplicates(subset=["id"])
-    predictions_df.set_index("id", inplace=True)
-
     predictions_df["chat_history"] = predictions_df["chat_history"].apply(
         lambda x: eval(x)
     )
+
+    return predictions_df
+
+
+@register("gemini", FILE_PREPARATION)
+def gemini_file_preparation(input_filepath):
+    input_filepath = Path(input_filepath)
+
+    predictions = []
+    with open(input_filepath, mode="r", encoding="utf-8", errors="strict") as f:
+        predictions = [json.loads(line) for line in f.readlines()]
+
+    new_compatible_pred = []
+    for pred in predictions:
+        new_pred = {}
+        new_pred["id"] = pred["key"]
+        new_pred["chat_history"] = []
+
+        for content in pred["request"]["contents"]:
+            text = []
+            for part in content["parts"]:
+                if "text" in part.keys():
+                    text.append("\n" + part["text"])
+
+            text = "".join(text)
+            new_pred["chat_history"].append({"role": content["role"], "content": text})
+
+        new_compatible_pred.append(new_pred)
+
+    return pd.DataFrame(new_compatible_pred)
+
+
+def ans_extract(input_filepath, model, format="ollama"):
+    file_preparator = FILE_PREPARATION[format]
+    predictions_df = file_preparator(input_filepath)
+
+    predictions_df = predictions_df.drop_duplicates(subset=["id"])
+    predictions_df.set_index("id", inplace=True)
 
     original_df = predictions_df[["chat_history"]].copy()
     # the final answer is contained in the last message
@@ -127,8 +167,17 @@ def ans_extract(input_filepath, model):
 
     # -------------- Extracting answers
 
+    def safe_eval(x):
+        try:
+            evaluated = eval(x)
+            return evaluated
+        except (SyntaxError, NameError, KeyError, AttributeError):
+            # Handle the exception and return a default value
+            logger.warning(f"Error executing eval on: {x}.")
+            return None
+
     predictions_df["answer"] = predictions_df["answer"].apply(
-        lambda x: eval(x)["answer"].strip()
+        lambda x: result["answer"].strip() if (result := safe_eval(x)) else ""
     )
 
     ans_regex_pattern = r"^(?:[A-Z]\.)\s+((?:\w+(?:\s|\/)?){,10}\.?)"
