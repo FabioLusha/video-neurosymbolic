@@ -125,7 +125,7 @@ def sgg_format(key, text, b64images, gen_config=None, safety_settings=None):
     return format
 
 
-def gu_format(key, text, gen_config=None, safety_settings=None):
+def gu_format(key, text, gen_config=None, system_instruction=None, safety_settings=None):
     gen_config = gen_config or DEFAULT_GEN_CONFIG_ENTRY
     format = {
         "key": key,
@@ -140,7 +140,10 @@ def gu_format(key, text, gen_config=None, safety_settings=None):
         },
     }
 
+    if system_instruction:
+        format["request"]["system_instruction"] = {"parts": [{"text": system_instruction}]}
     # TODO: Add safety settings if needed
+    return format
  
 
 
@@ -204,10 +207,16 @@ def batch(
                     gen_config=gen_config,
                 )
         elif task == "graph-understanding":
+            # FIXME: remove the hardcoded system instructions
+            # make it extensible
+            with open(SRC_DIR / "data/prompts/zero-shot-cot/MCQ_system_prompt_ZS_CoT.txt") as f:
+                sys_prompt = f.read()
+
             generate_content_request = gu_format(
                 key=sample["question_id"],
                 text=sample["prompt"],
-                gen_config=gen_config
+                gen_config=gen_config,
+                system_instruction=sys_prompt
             )
         else:
             raise ValueError(f"mode {task} not implemented yet")
@@ -239,13 +248,12 @@ def preprocess_dataset_to_request(
         prompt_formatter = prompt_formatters.MCQPromptWoutSTSG(user_prompt_text)
         dataset = STARDataset(input_dataset_path, prompt_formatter)
     elif task == "sgg":
-        prompt_formatter = prompt_formatters.MCQPromptWoutSTSG(user_prompt_text)
+        prompt_formatter = prompt_formatters.PromptFormatter(user_prompt_text)
         dataset = STARDataset(input_dataset_path, prompt_formatter)
     elif task == "graph-understanding":
         #FIXME: Add system prompt to configurations for graph-understanding task
-        # Could be done by having a local gen_config intialized to DEFAUL_GEN_CONFIG
-        # which is updated depending on the case
-        prompt_formatter = prompt_formatters.PromptFormatter(user_prompt_text)
+        # The system instuction don't go in the genConfig
+        prompt_formatter = prompt_formatters.MCQPrompt(user_prompt_text)
         dataset = STARDataset(
             input_dataset_path,
             prompt_formatter,
@@ -254,7 +262,8 @@ def preprocess_dataset_to_request(
     else:
         raise ValueError(f"Unexpected task: {task}! Admissibile tasks: {TASKS}")
 
-    if limit_n:
+
+    if limit_n and limit_n < len(dataset):
         dataset = [dataset[i] for i in range(limit_n)]
 
     size = len(dataset)

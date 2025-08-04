@@ -10,9 +10,14 @@ import gemini_batch_processing
 logger = logging.getLogger("experiment")
 
 def main(client):
+
+    # ===========================================================================
+    #
     # task = "vqa"
     #
     # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    # stsg_file = None
+    #
     # limit_n = 200
     # n_chunks = 4
     # user_prompt = "../data/prompts/vqa/user_prompt.txt"
@@ -20,20 +25,49 @@ def main(client):
     # fps = 1
     # max_frames = 64
     # output_file = "../scripts/data/vqa_gemini_flash.jsonl"
+    #
+    # reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
+    #
+    # ===========================================================================
 
-    task = "sgg"
+    # task = "sgg"
+    #
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    # stsg_file = None
+    #
+    # limit_n = 200
+    # n_chunks = 2
+    # user_prompt = "../data/prompts/graph-gen/user_prompt_v2_gemini.txt"
+    # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+    # fps = 1
+    # max_frames = 64
+    # output_file = "../scripts/data/sgg_gemini2.5flash.jsonl"
+    #
+    # # vqa or graph-understanding
+    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+
+    # ===========================================================================
+
+    task = "graph-understanding"
 
     input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    stsg_file = "data/aggregated_final_sgg_200.jsonl"
     limit_n = 200
-    n_chunks = 4
-    user_prompt = "../data/prompts/graph-gen/user_prompt_v2_gemini.txt"
+    n_chunks = 2
+    user_prompt = "../data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v3.txt"
     videos_dir = "../data/datasets/action-genome/Charades_v1_480"
     fps = 1
     max_frames = 64
-    output_file = "../scripts/data/sgg_200.jsonl"
+    output_file = "../scripts/data/gu_u3_on_geminiSGG_gemini2.5flash_20250804_21:49:00.jsonl"
+
+    # vqa or graph-understanding
+    reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+
+    # ===========================================================================
 
     chunks_filenames = gemini_batch_creation.preprocess_dataset_to_request(
         input_dataset_path=input_dataset,
+        stsg_file_path=stsg_file,
         task=task,
         user_prompt_path=user_prompt,
         videos_dir=videos_dir,
@@ -44,10 +78,7 @@ def main(client):
         n_chunks=n_chunks,
     )
 
-    # vqa or graph-understanding
-    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
     # sgg
-    reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
     model_name = "gemini-2.5-flash"
     results = asyncio.run(
         gemini_batch_processing.zero_shot_cot_batch_pipeline(
@@ -57,7 +88,6 @@ def main(client):
             *chunks_filenames,
         )
     )
-
     logger.info("Aggregating chunked results.")
     concat = []
     for result in results:
