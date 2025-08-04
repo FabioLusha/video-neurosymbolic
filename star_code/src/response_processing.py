@@ -22,7 +22,7 @@ def register(name: str, container: dict[str, Callable]):
 
 
 @register("gemma3", MODEL_PREPROCESSING)
-def gemma3_preprocessing(predictions_df):
+def _gemma3_preprocessing(predictions_df):
     # For Gemma we need to be more careful becuase the format is different, it encapsulated the json output in the with the tokens:
     # ```
     # ```json\n
@@ -80,7 +80,7 @@ def gemma3_preprocessing(predictions_df):
 
 
 @register("qwen2.5vl", MODEL_PREPROCESSING)
-def qwen25_preprocessing(predictions_df):
+def _qwen25_preprocessing(predictions_df):
     json_pattern = r"^(?:```json\s)?({[^}]+})(?:\s*```)?"
     json_mask = predictions_df["answer"].str.match(json_pattern)
     predictions_df["json_mask"] = json_mask
@@ -101,7 +101,7 @@ def qwen25_preprocessing(predictions_df):
 
 
 @register("ollama", FILE_PREPARATION)
-def ollama_file_prepartion(input_filepath):
+def _ollama_file_prepartion(input_filepath):
     input_filepath = Path(input_filepath)
 
     predictions = []
@@ -121,7 +121,7 @@ def ollama_file_prepartion(input_filepath):
 
 
 @register("gemini", FILE_PREPARATION)
-def gemini_file_preparation(input_filepath):
+def _gemini_file_preparation(input_filepath):
     input_filepath = Path(input_filepath)
 
     predictions = []
@@ -185,13 +185,14 @@ def ans_extract(input_filepath, model, format="ollama"):
         ans_regex_pattern, regex=True
     )
 
+    n_valid_answers = contains_answer.sum()
     print(
-        f"Answer with a valid alternative: {contains_answer.value_counts()[True]}\n"
-        f"{contains_answer.value_counts()[True] / predictions_df.shape[0]:.2%} of the total"
+        f"Answer with a valid alternative: {n_valid_answers}\n"
+        f"{n_valid_answers / predictions_df.shape[0]:.2%} of the total"
     )
 
     print(
-        f"\nInvalid answers: {contains_answer.shape[0] - contains_answer.value_counts()[True]}"
+        f"\nInvalid answers: {contains_answer.shape[0] - n_valid_answers }"
     )
 
     ans_df = (
@@ -241,7 +242,7 @@ def gemma3_ans_extract(input_filepath):
         lambda x: x[-1]["content"]
     )
 
-    predictions_df = gemma3_preprocessing(predictions_df)
+    predictions_df = _gemma3_preprocessing(predictions_df)
 
     # -------------- Extracting answers
 
