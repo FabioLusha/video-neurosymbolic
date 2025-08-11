@@ -12,7 +12,7 @@ responses
 
 # text
 regex
-gensim
+#gensim
 nltk
 
 # plotting
@@ -49,9 +49,9 @@ jupyter_nbextensions_configurator
 ipykernel
 
 # PyTorch
-torch
-tiktoken
-blobfile
+#torch
+#tiktoken
+#blobfile
 
 networkx
 packaging
