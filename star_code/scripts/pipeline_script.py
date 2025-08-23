@@ -13,55 +13,54 @@ def main(client):
 
     # ===========================================================================
     #
-    # task = "vqa"
-    #
-    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
-    # stsg_file = None
-    #
-    # limit_n = 200
-    # n_chunks = 4
-    # user_prompt = "../data/prompts/vqa/user_prompt.txt"
-    # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
-    # fps = 1
-    # max_frames = 64
-    # output_file = "../scripts/data/vqa_gemini_flash.jsonl"
-    #
-    # reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
-    #
+    task = "vqa"
+
+    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
+    stsg_file = None
+
+    limit_n = None
+    n_chunks = 10
+    user_prompt = "../data/prompts/vqa/user_prompt.txt"
+    videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+    fps = 1
+    max_frames = 64
+    output_file = "../scripts/data/vqa_gemini_flash.jsonl"
+
+    reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+
     # ===========================================================================
 
     # task = "sgg"
     #
-    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
     # stsg_file = None
     #
-    # limit_n = 200
-    # n_chunks = 2
+    # limit_n = None
+    # n_chunks = 10
     # user_prompt = "../data/prompts/graph-gen/user_prompt_v2_gemini.txt"
     # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
     # fps = 1
     # max_frames = 64
-    # output_file = "../scripts/data/sgg_gemini2.5flash.jsonl"
+    # output_file = "../scripts/data/sgg_gemini2.5flash_1000.jsonl"
     #
-    # # vqa or graph-understanding
-    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+    # reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
 
     # ===========================================================================
 
-    task = "graph-understanding"
+    # task = "graph-understanding"
 
-    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
-    stsg_file = "data/aggregated_final_sgg_200.jsonl"
-    limit_n = 200
-    n_chunks = 2
-    user_prompt = "../data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v3.txt"
-    videos_dir = "../data/datasets/action-genome/Charades_v1_480"
-    fps = 1
-    max_frames = 64
-    output_file = "../scripts/data/gu_u3_on_geminiSGG_gemini2.5flash_20250804_21:49:00.jsonl"
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
+    # stsg_file = "data/aggregated_final_sgg_gemini25flash_1000.jsonl"
+    # limit_n = None
+    # n_chunks = 10
+    # user_prompt = "../data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v3.txt"
+    # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+    # fps = 1
+    # max_frames = 64
+    # output_file = "../scripts/data/gu_u3_1000_on_geminiSGG_gemini25flash_20250805_15:48:00.jsonl"
 
-    # vqa or graph-understanding
-    reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+    # # vqa or graph-understanding
+    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
 
     # ===========================================================================
 
