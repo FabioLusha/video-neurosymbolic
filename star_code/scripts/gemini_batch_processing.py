@@ -139,12 +139,11 @@ async def run_batch_job(client, input_file: str, model, dest_folder=None):
 
 async def append_response_to_query(input_batch, response_batch):
     query_data_df = pd.DataFrame(input_batch)
-    response_data_df = pd.DataFrame(response_batch).fillna(value=None)
+    response_data_df = pd.DataFrame(response_batch)
 
     # Gemini can return multiple candidates for a question
     # the content of a candidate contains the 'Content' for the response
     # with the role and parts of the response
-    #
     response_data_df["response_content"] = response_data_df["response"].apply(
         # We need to make some existence cheks because the anser the result response
         # may fail for different reasons (i.e. Blocked becuse of "safety settings"
@@ -170,7 +169,7 @@ async def append_response_to_query(input_batch, response_batch):
     for request in new_batch:
         request["request"]["contents"].append(request.pop("response_content"))
 
-    return new_batch
+    return new_batch[['key', 'request']]
 
 
 async def append_default_reply(input_batch: List[Dict], reply_filepath):
