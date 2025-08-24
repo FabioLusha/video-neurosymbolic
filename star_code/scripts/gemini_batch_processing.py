@@ -139,7 +139,7 @@ async def run_batch_job(client, input_file: str, model, dest_folder=None):
 
 async def append_response_to_query(input_batch, response_batch):
     query_data_df = pd.DataFrame(input_batch)
-    response_data_df = pd.DataFrame(response_batch)
+    response_data_df = pd.DataFrame(response_batch).fillna(value=None)
 
     # Gemini can return multiple candidates for a question
     # the content of a candidate contains the 'Content' for the response
@@ -149,7 +149,9 @@ async def append_response_to_query(input_batch, response_batch):
         # We need to make some existence cheks because the anser the result response
         # may fail for different reasons (i.e. Blocked becuse of "safety settings"
         lambda x: x["candidates"][0]["content"]
-        if "candidates" in x.keys()
+        if x                            # first check that response is not NaN
+        and isinstance(x, dict)
+        and "candidates" in x.keys()
         and x["candidates"]  # check the existence of the list
         and "content" in x["candidates"][0].keys()
         else None
@@ -300,5 +302,4 @@ if __name__ == "__main__":
     SRC_DIR = str(Path(__file__).resolve().parent.parent)
     sys.path.append(str(SRC_DIR))
     from src.utils import logg
-
     logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")
