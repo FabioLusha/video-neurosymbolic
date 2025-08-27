@@ -6,6 +6,7 @@ import asyncio
 
 from gemini_batch_processing import (
     batch_processor,
+    append_response_to_query
 )
 
 import logging
@@ -13,10 +14,16 @@ logger = logging.getLogger("experiment")
 
 async def main(client):
 
+    # new_batch_paths = [
+    #     "data/vqa_gemini_flash_chunk_02_2nd_lean.jsonl",
+    #     "data/vqa_gemini_flash_chunk_03_2nd_lean.jsonl",
+    #     "data/vqa_gemini_flash_chunk_06_2nd_lean.jsonl",
+    # ]
     new_batch_paths = [
-        "data/vqa_gemini_flash_chunk_03_2nd_lean.jsonl",
-        "data/vqa_gemini_flash_chunk_06_2nd_lean.jsonl",
+        "data/sgg_gemini2.5flash_1000_20250824_20:00:00_chunk_04_2nd_lean.jsonl",
+        "data/sgg_gemini2.5flash_1000_20250824_20:00:00_chunk_06_2nd_lean.jsonl"
     ]
+
     model_name = "gemini-2.5-flash"
 
 
