@@ -64,7 +64,7 @@ DEFAULT_GEN_CONFIG_ENTRY = {
         "thinkingBudget": 0,  # Disable thinking
         "includeThoughts": True,  # For troublehshooting
     },
-    "maxOutputTokens": 1024,
+    "maxOutputTokens": 8_192,
     "seed": 6,
 }
 
