@@ -163,13 +163,13 @@ async def append_response_to_query(input_batch, response_batch):
         )
     ]
 
-    new_batch = query_data_df.merge(response_data_df, on="key", how="inner").to_dict(
-        orient="records"
-    )
-    for request in new_batch:
-        request["request"]["contents"].append(request.pop("response_content"))
+    new_batch = query_data_df.merge(response_data_df, on="key", how="inner")
+    for _, row in new_batch.iterrows():
+        # the assigment has effect because `request` is a dict (a mutable object)
+        # and the change is reflected on the DataFrame
+        row["request"]["contents"].append(row.pop("response_content"))
 
-    return new_batch[['key', 'request']]
+    return new_batch[['key', 'request']].to_dict(orient="records")
 
 
 async def append_default_reply(input_batch: List[Dict], reply_filepath):
