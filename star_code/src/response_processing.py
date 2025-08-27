@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Callable
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from deprecated import deprecated
 
 logger = logging.getLogger("data_preprocessing")
@@ -367,3 +370,141 @@ def print_ans_perc(eval_df, gt_df):
     total = gt_df.shape[0]
     acc = eval_df.shape[0] / total
     print(f"{'Overall':<15}{total:^15}{acc:^10.2%}")
+
+
+def plot_acc(eval_df, acc_fn):
+    """
+    Creates a minimal and concise visualization of model accuracy.
+
+    Args:
+        eval_df (pd.DataFrame): The DataFrame with evaluation results.
+        acc_fn (function): A function that takes a DataFrame and returns the
+                           accuracy score as a float.
+    """
+    # 1. --- Data Preparation ---
+    question_types = ["Interaction", "Sequence", "Prediction", "Feasibility"]
+    summary_data = []
+    for q_type in question_types:
+        filtered_df = eval_df[eval_df.index.str.startswith(q_type)]
+        accuracy = acc_fn(filtered_df) * 100 if not filtered_df.empty else 0
+        summary_data.append({"Question type": q_type, "Accuracy": accuracy})
+
+    summary_df = pd.DataFrame(summary_data)
+    average_accuracy = acc_fn(eval_df) * 100 if not eval_df.empty else 0
+
+    # 2. --- Visualization ---
+    plt.style.use('seaborn-v0_8-whitegrid') # Use a clean, minimal style
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Use a gradient color palette
+    barplot = sns.barplot(
+        x='Question type',
+        y='Accuracy',
+        data=summary_df,
+        color='Blue', # Use a dark blue gradient
+        ax=ax
+    )
+
+    # Add average accuracy line
+    ax.axhline(y=average_accuracy, color='#ff0000', linestyle='--', linewidth=1)
+    ax.text(
+        3.5, average_accuracy, # x, y positions
+        f'Avg: {average_accuracy:.2f}%',
+        va='center', ha='right', fontsize=11, color='#ff0000',
+        bbox=dict(color="#ffffff", edgecolor='#ff0000', pad=0.2)
+    )
+
+    # Annotate bars
+    for p in ax.patches:
+        ax.annotate(f"{p.get_height():.2f}%",
+                    (p.get_x() + p.get_width() / 2., p.get_height()),
+                    ha='center', va='bottom', fontsize=10,
+                    textcoords='offset points', xytext=(0, 5))
+
+    # 3. --- Polishing ---
+    ax.text(-0.5, 118, 'Model Accuracy by Question Type', fontsize=20, fontweight='bold', ha='left')
+    ax.text(-0.5, 110, f'Performance across four categories based on {len(eval_df)} answered samples',
+            fontsize=14, ha='left', style='italic', color='#666666')
+
+    ax.set_xlabel('') # The category names are self-explanatory
+    ax.set_ylabel('Accuracy', fontsize=12, labelpad=15)
+    ax.set_ylim(0, 105)
+    ax.set_yticks(range(0, 101, 20))
+    ax.set_yticklabels([f'{y}%' for y in range(0, 101, 20)])
+    ax.tick_params(axis='x', length=0) # Remove x-axis ticks
+
+    # Remove unnecessary spines and ticks
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='x', length=0)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_ans_perc(eval_df, gt_df):
+    """
+    Creates an elegant, publication-quality visualization of answered percentage,
+    inspired by the aesthetics of Anthropic and distill.pub.
+
+    Args:
+        eval_df (pd.DataFrame): DataFrame with answered samples.
+        gt_df (pd.DataFrame): Ground truth DataFrame with all samples.
+    """
+    # 1. --- Data Preparation ---
+    question_types = ["Interaction", "Sequence", "Prediction", "Feasibility"]
+    summary_data = []
+    for q_type in question_types:
+        total = gt_df.index.str.startswith(q_type).sum()
+        answered_count = len(eval_df[eval_df.index.str.startswith(q_type)])
+        percentage = (answered_count / total) * 100 if total > 0 else 0
+        summary_data.append({"Question type": q_type, "Answered": percentage})
+
+    overall_percentage = (len(eval_df) / len(gt_df)) * 100 if not gt_df.empty else 0
+    summary_df = pd.DataFrame(summary_data)
+    
+    # 2. --- Style and Color Definition ---
+    # A different but equally professional palette
+    plt.style.use('default')
+    
+    # 3. --- Visualization ---
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    barplot = sns.barplot(
+        x='Question type', y='Answered', color="Blue", data=summary_df, ax=ax
+    )
+    
+    ax.axhline(y=overall_percentage, color="#ff0000", linestyle='--', linewidth=1.5)
+    
+    ax.text(
+        3.5, overall_percentage,
+        f'Avg: {overall_percentage:.2f}%  ',
+        va='center', ha='right', fontsize=12, color='#ff0000',
+        bbox=dict(color="#ffffff", edgecolor='#ff0000', pad=0.2)
+    )
+
+    for p in ax.patches:
+        ax.annotate(
+            f"{p.get_height():.2f}%", (p.get_x() + p.get_width() / 2., p.get_height()),
+            ha='center', va='center', xytext=(0, 10), textcoords='offset points',
+            fontsize=11, fontweight='medium'
+        )
+
+    # 4. --- Polishing ---
+    ax.text(-0.5, 118, 'Percentage of Questions Answered by Type', fontsize=20, fontweight='bold', ha='left')
+    ax.text(-0.5, 110, f'Comparing {len(eval_df)} answered samples against {len(gt_df)} total in the ground truth',
+            fontsize=14, ha='left', style='italic', color='#666666')
+
+    ax.set_xlabel('')
+    ax.set_ylabel('Answered', fontsize=12, labelpad=15)
+    ax.set_ylim(0, 105)
+    ax.set_yticks(range(0, 101, 20))
+    ax.set_yticklabels([f'{y}%' for y in range(0, 101, 20)])
+    ax.tick_params(axis='x', length=0)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
+    
+    plt.tight_layout(pad=2)
+    plt.show()

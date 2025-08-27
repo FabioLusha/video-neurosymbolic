@@ -1,7 +1,6 @@
 import requests
 import webbrowser
 import os
-from pathlib import Path
 
 import base64
 import io
@@ -55,10 +54,13 @@ def compact_print_qa(idx, gt_dataset_df, predictors, predictor_labels=None):
         answer = pred.loc[idx].get("answer", None) or pred.loc[idx]["pred_text"]
 
         status = "[CORRECT]" if answer.lower() == gt_answer.lower() else "[WRONG]"
-        print("|")
-        print(f"│ Model Predictions - {label}:")
-        print(f"│    Prediction:  {answer} {status}")
-        print("│    Reasoning:")
+        print(
+             "│\n"
+            f"│ Model Predictions - {label}:\n"
+            f"│    Prediction:\n"
+            f"│        {answer} {status}\n"
+             "│    Reasoning:"
+        )
         print("\n".join([f"│        {line}" for line in reasoning.split("\n")]))
     print("│")
     print("└" + "─" * 85)
