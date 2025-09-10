@@ -117,6 +117,8 @@ async def download_result_file(client, batch_job, dest_folder=None):
         raise e
 
 
+
+
 async def run_batch_job(client, input_file: str, model, dest_folder=None):
     remote_batch_file = await upload_file(client, input_file)
     batch_job = await create_batch_job(client, model, remote_batch_file)
@@ -125,9 +127,16 @@ async def run_batch_job(client, input_file: str, model, dest_folder=None):
     if result_state == gtypes.JobState.JOB_STATE_SUCCEEDED:
         # refreshing batch_obj reference
         final_batch_job = await client.aio.batches.get(name=batch_job.name)
-        result_filepath = await download_result_file(
-            client, final_batch_job, dest_folder
-        )
+        try:
+            result_filepath = await download_result_file(
+                client, final_batch_job, dest_folder
+            )
+
+            await client.aio.batches.delete(name=batch_job.name)
+            await client.aio.files.delete(name=remote_batch_file.name)
+        except Exception as e:
+            raise e
+
     else:
         logger.error(
             f"Batch job {batch_job.name} failed with state: {result_state.name}"
@@ -148,7 +157,7 @@ async def append_response_to_query(input_batch, response_batch):
         # We need to make some existence cheks because the anser the result response
         # may fail for different reasons (i.e. Blocked becuse of "safety settings"
         lambda x: x["candidates"][0]["content"]
-        if x                            # first check that response is not NaN
+        if x  # first check that response is not NaN
         and isinstance(x, dict)
         and "candidates" in x.keys()
         and x["candidates"]  # check the existence of the list
@@ -169,7 +178,7 @@ async def append_response_to_query(input_batch, response_batch):
         # and the change is reflected on the DataFrame
         row["request"]["contents"].append(row.pop("response_content"))
 
-    return new_batch[['key', 'request']].to_dict(orient="records")
+    return new_batch[["key", "request"]].to_dict(orient="records")
 
 
 async def append_default_reply(input_batch: List[Dict], reply_filepath):
@@ -256,7 +265,11 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
             with response_fpath.open("r") as f:
                 out_batch = [json.loads(line) for line in f.readlines()]
 
+            logger.info(
+                f"Appending response from {response_fpath.name} to {input_fpath.name}"
+            )
             new_batch = await append_response_to_query(input_batch, out_batch)
+            logger.info("Appending default_reply")
             new_batch = await append_default_reply(new_batch, reply_file)
 
             out_fpath = input_fpath.with_stem(f"{input_fpath.stem}_2nd")
@@ -285,6 +298,9 @@ async def zero_shot_cot_batch_pipeline(client, model_name, reply_file, *input_fi
             with response_fpath.open("r") as f:
                 out_batch = [json.loads(line) for line in f.readlines()]
 
+            logger.info(
+                f"Appending response from {response_fpath.name} to {input_fpath.name}"
+            )
             new_batch = await append_response_to_query(input_batch, out_batch)
 
             out_fpath = input_fpath.with_stem(f"{input_fpath.stem}_chat_history")
@@ -301,4 +317,5 @@ if __name__ == "__main__":
     SRC_DIR = str(Path(__file__).resolve().parent.parent)
     sys.path.append(str(SRC_DIR))
     from src.utils import logg
+
     logg.logging_setup(f"batch-processing-{datetime.now().strftime('%Y%m%d_%H:%M:%S')}")
