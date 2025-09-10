@@ -66,6 +66,7 @@ DEFAULT_GEN_CONFIG_ENTRY = {
     },
     "maxOutputTokens": 8_192,
     "seed": 6,
+    "temperature": 0.7,
 }
 
 
