@@ -4,10 +4,9 @@ import re
 from pathlib import Path
 from typing import Callable
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
-
 from deprecated import deprecated
 
 logger = logging.getLogger("data_preprocessing")
@@ -194,9 +193,7 @@ def ans_extract(input_filepath, model, format="ollama"):
         f"{n_valid_answers / predictions_df.shape[0]:.2%} of the total"
     )
 
-    print(
-        f"\nInvalid answers: {contains_answer.shape[0] - n_valid_answers }"
-    )
+    print(f"\nInvalid answers: {contains_answer.shape[0] - n_valid_answers}")
 
     ans_df = (
         predictions_df[contains_answer]["answer"]
@@ -372,139 +369,312 @@ def print_ans_perc(eval_df, gt_df):
     print(f"{'Overall':<15}{total:^15}{acc:^10.2%}")
 
 
-def plot_acc(eval_df, acc_fn):
+def plot_acc(eval_df, acc_fn, labels=None):
     """
     Creates a minimal and concise visualization of model accuracy.
 
+    This function is polymorphic: it can accept a single DataFrame or a list of
+    DataFrames for `eval_df`. When a list is provided, it plots a grouped
+    bar chart for comparison, with sample counts in the legend.
+
     Args:
-        eval_df (pd.DataFrame): The DataFrame with evaluation results.
+        eval_df (pd.DataFrame or list[pd.DataFrame]): The DataFrame(s) with
+                                                     evaluation results.
         acc_fn (function): A function that takes a DataFrame and returns the
                            accuracy score as a float.
+        labels (list[str], optional): A list of names for the models/dataframes,
+                                      corresponding to the DataFrames in eval_df.
+                                      Defaults to None.
     """
     # 1. --- Data Preparation ---
+    is_list = isinstance(eval_df, list)
+    if not is_list:
+        eval_df = [eval_df]
+        if labels is None:
+            labels = ["Model"]
+
+    if labels is None:
+        labels = [f"Model {i + 1}" for i in range(len(eval_df))]
+
     question_types = ["Interaction", "Sequence", "Prediction", "Feasibility"]
     summary_data = []
-    for q_type in question_types:
-        filtered_df = eval_df[eval_df.index.str.startswith(q_type)]
-        accuracy = acc_fn(filtered_df) * 100 if not filtered_df.empty else 0
-        summary_data.append({"Question type": q_type, "Accuracy": accuracy})
+    average_accuracies = {}
+    samples_per_label = {}
+
+    for i, (df, label) in enumerate(zip(eval_df, labels)):
+        samples_per_label[label] = len(df)
+        for q_type in question_types:
+            filtered_df = df[df.index.str.startswith(q_type)]
+            accuracy = acc_fn(filtered_df) * 100 if not filtered_df.empty else 0
+            summary_data.append(
+                {"Question type": q_type, "Accuracy": accuracy, "Label": label}
+            )
+        average_accuracies[label] = acc_fn(df) * 100 if not df.empty else 0
 
     summary_df = pd.DataFrame(summary_data)
-    average_accuracy = acc_fn(eval_df) * 100 if not eval_df.empty else 0
 
     # 2. --- Visualization ---
-    plt.style.use('seaborn-v0_8-whitegrid') # Use a clean, minimal style
-    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.style.use("seaborn-v0_8-whitegrid")
+    fig, ax = plt.subplots(figsize=(12, 7))
 
-    # Use a gradient color palette
-    barplot = sns.barplot(
-        x='Question type',
-        y='Accuracy',
-        data=summary_df,
-        color='Blue', # Use a dark blue gradient
-        ax=ax
-    )
-
-    # Add average accuracy line
-    ax.axhline(y=average_accuracy, color='#ff0000', linestyle='--', linewidth=1)
-    ax.text(
-        3.5, average_accuracy, # x, y positions
-        f'Avg: {average_accuracy:.2f}%',
-        va='center', ha='right', fontsize=11, color='#ff0000',
-        bbox=dict(color="#ffffff", edgecolor='#ff0000', pad=0.2)
-    )
+    # Use distinct plotting logic for single vs. multiple dataframes
+    if is_list:
+        # For multiple DFs, use a palette and hue for grouping
+        palette = sns.color_palette(n_colors=len(eval_df))
+        sns.barplot(
+            x="Question type",
+            y="Accuracy",
+            hue="Label",
+            data=summary_df,
+            palette=palette,
+            ax=ax,
+        )
+        # Add average accuracy lines matching the hue colors
+        for i, (label, avg_acc) in enumerate(average_accuracies.items()):
+            ax.axhline(
+                y=avg_acc, color=palette[i % len(palette)], linestyle="--", linewidth=1
+            )
+            ax.text(
+                3.6,
+                avg_acc,
+                f"Avg ({label}): {avg_acc:.2f}%",
+                va="center",
+                ha="right",
+                fontsize=10,
+                color=palette[i % len(palette)],
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    fc="white",
+                    ec=palette[i % len(palette)],
+                    lw=1,
+                ),
+            )
+    else:
+        # For a single DF, use the 'color' argument to avoid warnings
+        sns.barplot(
+            x="Question type", y="Accuracy", data=summary_df, color="Blue", ax=ax
+        )
+        # Add a single, distinct average accuracy line
+        label, avg_acc = list(average_accuracies.items())[0]
+        ax.axhline(y=avg_acc, color="#ff0000", linestyle="--", linewidth=1)
+        ax.text(
+            3.5,
+            avg_acc,
+            f"Avg: {avg_acc:.2f}%",
+            va="center",
+            ha="right",
+            fontsize=11,
+            color="#ff0000",
+            bbox=dict(color="#ffffff", edgecolor="#ff0000", pad=0.2),
+        )
 
     # Annotate bars
     for p in ax.patches:
-        ax.annotate(f"{p.get_height():.2f}%",
-                    (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha='center', va='bottom', fontsize=10,
-                    textcoords='offset points', xytext=(0, 5))
+        ax.annotate(
+            f"{p.get_height():.1f}%",
+            (p.get_x() + p.get_width() / 2.0, p.get_height()),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            textcoords="offset points",
+            xytext=(0, 5),
+        )
 
     # 3. --- Polishing ---
-    ax.text(-0.5, 118, 'Model Accuracy by Question Type', fontsize=20, fontweight='bold', ha='left')
-    ax.text(-0.5, 110, f'Performance across four categories based on {len(eval_df)} answered samples',
-            fontsize=14, ha='left', style='italic', color='#666666')
+    title = "Model Comparison" if is_list else "Model Accuracy"
+    ax.text(
+        -0.5,
+        118,
+        f"{title} by Question Type",
+        fontsize=20,
+        fontweight="bold",
+        ha="left",
+    )
 
-    ax.set_xlabel('') # The category names are self-explanatory
-    ax.set_ylabel('Accuracy', fontsize=12, labelpad=15)
+    if not is_list:
+        sample_count = samples_per_label[labels[0]]
+        ax.text(
+            -0.5,
+            110,
+            f"Performance across four categories based on {sample_count} answered samples",
+            fontsize=14,
+            ha="left",
+            style="italic",
+            color="#666666",
+        )
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Accuracy", fontsize=12, labelpad=15)
     ax.set_ylim(0, 105)
     ax.set_yticks(range(0, 101, 20))
-    ax.set_yticklabels([f'{y}%' for y in range(0, 101, 20)])
-    ax.tick_params(axis='x', length=0) # Remove x-axis ticks
+    ax.set_yticklabels([f"{y}%" for y in range(0, 101, 20)])
+    ax.tick_params(axis="x", length=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
-    # Remove unnecessary spines and ticks
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.tick_params(axis='x', length=0)
+    # If multiple models, modify the legend to include sample counts
+    if is_list:
+        legend = ax.get_legend()
+        if legend:
+            legend.set_title("Label")
+            for i, label in enumerate(labels):
+                sample_count = samples_per_label[label]
+                legend.texts[i].set_text(f"{label} (n_questions={sample_count})")
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_ans_perc(eval_df, gt_df):
+def plot_ans_perc(eval_df, gt_df, labels=None):
     """
-    Creates an elegant, publication-quality visualization of answered percentage,
-    inspired by the aesthetics of Anthropic and distill.pub.
+    Creates an elegant, publication-quality visualization of answered percentage.
+
+    This function is polymorphic: it can accept a single DataFrame or a list of
+    DataFrames for `eval_df`. When a list is provided, it plots a grouped
+    bar chart for comparison, with sample counts in the legend.
 
     Args:
-        eval_df (pd.DataFrame): DataFrame with answered samples.
-        gt_df (pd.DataFrame): Ground truth DataFrame with all samples.
+        eval_df (pd.DataFrame or list[pd.DataFrame]): The DataFrame(s) with
+                                                     evaluation results.
+        gt_df (pd.DataFrame): The ground truth DataFrame with all samples.
+        labels (list[str], optional): A list of names for the models/dataframes,
+                                      corresponding to the DataFrames in eval_df.
+                                      Defaults to None.
     """
     # 1. --- Data Preparation ---
+    is_list = isinstance(eval_df, list)
+    if not is_list:
+        eval_df = [eval_df]
+        if labels is None:
+            labels = ["Model"]
+
+    if labels is None:
+        labels = [f"Model {i + 1}" for i in range(len(eval_df))]
+
     question_types = ["Interaction", "Sequence", "Prediction", "Feasibility"]
     summary_data = []
-    for q_type in question_types:
-        total = gt_df.index.str.startswith(q_type).sum()
-        answered_count = len(eval_df[eval_df.index.str.startswith(q_type)])
-        percentage = (answered_count / total) * 100 if total > 0 else 0
-        summary_data.append({"Question type": q_type, "Answered": percentage})
+    average_percentages = {}
+    samples_per_label = {}
 
-    overall_percentage = (len(eval_df) / len(gt_df)) * 100 if not gt_df.empty else 0
+    for i, (df, label) in enumerate(zip(eval_df, labels)):
+        samples_per_label[label] = len(df)
+        for q_type in question_types:
+            total = gt_df.index.str.startswith(q_type).sum()
+            answered_count = len(df[df.index.str.startswith(q_type)])
+            percentage = (answered_count / total) * 100 if total > 0 else 0
+            summary_data.append(
+                {"Question type": q_type, "Answered": percentage, "Label": label}
+            )
+        average_percentages[label] = (
+            (len(df) / len(gt_df)) * 100 if not gt_df.empty else 0
+        )
+
     summary_df = pd.DataFrame(summary_data)
-    
-    # 2. --- Style and Color Definition ---
-    # A different but equally professional palette
-    plt.style.use('default')
-    
-    # 3. --- Visualization ---
+
+    # 2. --- Visualization ---
+    plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(12, 7))
 
-    barplot = sns.barplot(
-        x='Question type', y='Answered', color="Blue", data=summary_df, ax=ax
-    )
-    
-    ax.axhline(y=overall_percentage, color="#ff0000", linestyle='--', linewidth=1.5)
-    
-    ax.text(
-        3.5, overall_percentage,
-        f'Avg: {overall_percentage:.2f}%  ',
-        va='center', ha='right', fontsize=12, color='#ff0000',
-        bbox=dict(color="#ffffff", edgecolor='#ff0000', pad=0.2)
-    )
+    if is_list:
+        palette = sns.color_palette(n_colors=len(eval_df))
+        sns.barplot(
+            x="Question type",
+            y="Answered",
+            hue="Label",
+            data=summary_df,
+            palette=palette,
+            ax=ax,
+        )
+        for i, (label, avg_perc) in enumerate(average_percentages.items()):
+            ax.axhline(
+                y=avg_perc, color=palette[i % len(palette)], linestyle="--", linewidth=1
+            )
+            ax.text(
+                3.6,
+                avg_perc,
+                f"Avg ({label}): {avg_perc:.2f}%",
+                va="center",
+                ha="right",
+                fontsize=10,
+                color=palette[i % len(palette)],
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    fc="white",
+                    ec=palette[i % len(palette)],
+                    lw=1,
+                ),
+            )
+    else:
+        sns.barplot(
+            x="Question type", y="Answered", data=summary_df, color="Green", ax=ax
+        )
+        label, avg_perc = list(average_percentages.items())[0]
+        ax.axhline(y=avg_perc, color="#ff0000", linestyle="--", linewidth=1)
+        ax.text(
+            3.5,
+            avg_perc,
+            f"Avg: {avg_perc:.2f}%",
+            va="center",
+            ha="right",
+            fontsize=11,
+            color="#ff0000",
+            bbox=dict(color="#ffffff", edgecolor="#ff0000", pad=0.2),
+        )
 
     for p in ax.patches:
         ax.annotate(
-            f"{p.get_height():.2f}%", (p.get_x() + p.get_width() / 2., p.get_height()),
-            ha='center', va='center', xytext=(0, 10), textcoords='offset points',
-            fontsize=11, fontweight='medium'
+            f"{p.get_height():.1f}%",
+            (p.get_x() + p.get_width() / 2.0, p.get_height()),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            textcoords="offset points",
+            xytext=(0, 5),
         )
 
-    # 4. --- Polishing ---
-    ax.text(-0.5, 118, 'Percentage of Questions Answered by Type', fontsize=20, fontweight='bold', ha='left')
-    ax.text(-0.5, 110, f'Comparing {len(eval_df)} answered samples against {len(gt_df)} total in the ground truth',
-            fontsize=14, ha='left', style='italic', color='#666666')
+    # 3. --- Polishing ---
+    title = (
+        "Answered Questions Comparison"
+        if is_list
+        else "Percentage of Questions Answered"
+    )
+    ax.text(
+        -0.5,
+        118,
+        f"{title} by Type",
+        fontsize=20,
+        fontweight="bold",
+        ha="left",
+    )
 
-    ax.set_xlabel('')
-    ax.set_ylabel('Answered', fontsize=12, labelpad=15)
+    if not is_list:
+        sample_count = samples_per_label[labels[0]]
+        ax.text(
+            -0.5,
+            110,
+            f"Comparing {sample_count} answered samples against {len(gt_df)} total in the ground truth",
+            fontsize=14,
+            ha="left",
+            style="italic",
+            color="#666666",
+        )
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Answered", fontsize=12, labelpad=15)
     ax.set_ylim(0, 105)
     ax.set_yticks(range(0, 101, 20))
-    ax.set_yticklabels([f'{y}%' for y in range(0, 101, 20)])
-    ax.tick_params(axis='x', length=0)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
-    
-    plt.tight_layout(pad=2)
+    ax.set_yticklabels([f"{y}%" for y in range(0, 101, 20)])
+    ax.tick_params(axis="x", length=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    if is_list:
+        legend = ax.get_legend()
+        if legend:
+            legend.set_title("Label")
+            for i, label in enumerate(labels):
+                sample_count = samples_per_label[label]
+                legend.texts[i].set_text(f"{label} (n_questions={sample_count})")
+
+    plt.tight_layout()
     plt.show()
