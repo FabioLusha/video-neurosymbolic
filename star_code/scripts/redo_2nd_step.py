@@ -1,31 +1,42 @@
+import asyncio
+import json
+import logging
 import sys
 from pathlib import Path
-import json
 
-import asyncio
+from gemini_batch_processing import append_response_to_query, batch_processor
 
-from gemini_batch_processing import (
-    batch_processor,
-    append_response_to_query
-)
-
-import logging
 logger = logging.getLogger("experiment")
+SRC_DIR = Path(__file__).resolve().parent.parent.resolve()
 
-async def main(client):
 
+async def main(client, output_file=None):
     # new_batch_paths = [
     #     "data/vqa_gemini_flash_chunk_02_2nd_lean.jsonl",
     #     "data/vqa_gemini_flash_chunk_03_2nd_lean.jsonl",
     #     "data/vqa_gemini_flash_chunk_06_2nd_lean.jsonl",
     # ]
+    if output_file is None:
+        output_file = str(
+            "/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00.jsonl"
+        )
+    task = "graph-understanding"
+    out_path = Path(output_file)
+
+    second_batches = list(out_path.parent.glob(f"{out_path.stem}*_2nd.jsonl"))
+    finished_batches = list(
+        out_path.parent.glob(f"{out_path.stem}*_2nd_chat_history.jsonl")
+    )
+
+    finsished_stems = {x.stem for x in finished_batches}
+
     new_batch_paths = [
-        "data/sgg_gemini2.5flash_1000_20250824_20:00:00_chunk_04_2nd_lean.jsonl",
-        "data/sgg_gemini2.5flash_1000_20250824_20:00:00_chunk_06_2nd_lean.jsonl"
+        i for i in second_batches if f"{i.stem}_chat_history" not in finsished_stems
     ]
 
-    model_name = "gemini-2.5-flash"
+    finished_filenames = [str(x) for x in finished_batches]
 
+    model_name = "gemini-2.5-flash"
 
     final_results = await batch_processor(client, model_name, *new_batch_paths)
 
@@ -55,8 +66,42 @@ async def main(client):
 
             final_paths.append(str(out_fpath))
 
-    return final_paths
+    results = finished_filenames + final_paths
 
+    logger.info("Aggregating chunked results.")
+    concat = []
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+
+        with open(result, "r") as f:
+            concat += [json.loads(line) for line in f.readlines()]
+
+    if task == "sgg":
+        filtered_entries = []
+        for entry in concat:
+            try:
+                stsg = entry["request"]["contents"][-1]["parts"][0]["text"]
+            except Exception:
+                logger.error(
+                    f"Error while extracting stsg for key {entry['key']}. Skipping..."
+                )
+                continue
+
+            entry["stsg"] = stsg
+            entry["question_id"] = entry["key"]
+            filtered_entries.append(entry)
+        concat = filtered_entries
+
+    out_path = Path(output_file)
+    agg_filepath = out_path.with_stem(f"aggregated_final_{out_path.stem}")
+    with agg_filepath.open("w") as f:
+        for entry in concat:
+            f.write(json.dumps(entry) + "\n")
+
+    logger.info(f"Aggregated file saved in {str(agg_filepath)}")
+
+    return
 
 
 if __name__ == "__main__":
@@ -68,4 +113,8 @@ if __name__ == "__main__":
     logg.logging_setup("gemini-pipeline")
     client = gemini_utils.get_client()
 
-    asyncio.run(main(client))
+    out_file = None
+    if len(sys.argv) > 1:
+        out_file = Path(sys.argv[1]).resolve()
+
+    asyncio.run(main(client, out_file))

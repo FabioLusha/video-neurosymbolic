@@ -10,6 +10,7 @@ import pandas as pd
 from google.genai import types as gtypes
 
 logger = logging.getLogger("experiment")
+TMP_SAVE_DIR = "/megaverse/storage/lusha/outputs"
 
 
 async def upload_file(client, input_file: str):
@@ -86,7 +87,7 @@ async def monitor_batch_job(
 
 
 async def download_result_file(client, batch_job, dest_folder=None):
-    dest_folder = dest_folder or "outputs"
+    dest_folder = dest_folder or TMP_SAVE_DIR
 
     logger.info(f"Downloading results for: {batch_job.name}.")
     try:
