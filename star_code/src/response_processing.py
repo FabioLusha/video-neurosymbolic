@@ -209,7 +209,7 @@ def ans_extract(input_filepath, model, format="ollama"):
         contains_answer
     )
 
-    original_df.loc[:, "answer"] = ""
+    original_df.loc[:, "answer"] = predictions_df["answer"]
     original_df.loc[contains_answer[contains_answer].index, "answer"] = ans_df["answer"]
 
     return original_df
@@ -292,35 +292,49 @@ def accuracy(eval_df, on_what="text"):
     return hits_text / eval_df.shape[0]
 
 
-def print_acc(eval_df, acc_fn):
+def print_acc(eval_df, acc_fn=None):
+    if acc_fn is None:
+        acc_fn = accuracy
     print(f"{'Question type':<15}{'Total':^15}{'Accuracy':^10}\n")
+
+    results = {}
 
     total = eval_df.index.str.startswith("Interaction").sum()
     acc = acc_fn(eval_df[eval_df.index.str.startswith("Interaction")])
+    results["Interaction"] = acc
     print(f"{'Interaction':<15}{total:^15}{acc:^10.2%}")
 
     total = eval_df.index.str.startswith("Sequence").sum()
     acc = acc_fn(eval_df[eval_df.index.str.startswith("Sequence")])
+    results["Sequence"] = acc
     print(f"{'Sequence':<15}{total:^15}{acc:^10.2%}")
 
     total = eval_df.index.str.startswith("Prediction").sum()
     acc = acc_fn(eval_df[eval_df.index.str.startswith("Prediction")])
+    results["Prediction"] = acc
     print(f"{'Prediction':<15}{total:^15}{acc:^10.2%}")
 
     total = eval_df.index.str.startswith("Feasibility").sum()
     acc = acc_fn(eval_df[eval_df.index.str.startswith("Feasibility")])
+    results["Feasibility"] = acc
     print(f"{'Feasibility':<15}{total:^15}{acc:^10.2%}")
 
     print()
+
     total = eval_df.shape[0]
     acc = acc_fn(eval_df)
+    results["Average"] = acc
     print(f"{'Average':<15}{total:^15}{acc:^10.2%}")
+
+    return results
 
 
 def print_ans_perc(eval_df, gt_df):
     print(f"{'Question type':<15}{'Total':^15}{'Answered':^10}\n")
 
     total = gt_df.index.str.startswith("Interaction").sum()
+    results = {}
+
     acc = (
         len(
             gt_df.index.intersection(
@@ -329,6 +343,7 @@ def print_ans_perc(eval_df, gt_df):
         )
         / total
     )
+    results["Interaction"] = acc
     print(f"{'Interaction':<15}{total:^15}{acc:^10.2%}")
 
     total = gt_df.index.str.startswith("Sequence").sum()
@@ -340,6 +355,7 @@ def print_ans_perc(eval_df, gt_df):
         )
         / total
     )
+    results["Sequence"] = acc
     print(f"{'Sequence':<15}{total:^15}{acc:^10.2%}")
 
     total = gt_df.index.str.startswith("Prediction").sum()
@@ -351,6 +367,7 @@ def print_ans_perc(eval_df, gt_df):
         )
         / total
     )
+    results["Prediction"] = acc
     print(f"{'Prediction':<15}{total:^15}{acc:^10.2%}")
 
     total = gt_df.index.str.startswith("Feasibility").sum()
@@ -362,11 +379,15 @@ def print_ans_perc(eval_df, gt_df):
         )
         / total
     )
+    results["Feasibility"] = acc
     print(f"{'Feasibility':<15}{total:^15}{acc:^10.2%}")
 
     total = gt_df.shape[0]
     acc = eval_df.shape[0] / total
+    results["Average"] = acc
     print(f"{'Overall':<15}{total:^15}{acc:^10.2%}")
+
+    return results
 
 
 def plot_acc(eval_df, acc_fn, labels=None):
@@ -415,7 +436,7 @@ def plot_acc(eval_df, acc_fn, labels=None):
 
     # 2. --- Visualization ---
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(16, 9))
 
     # Use distinct plotting logic for single vs. multiple dataframes
     if is_list:
@@ -559,9 +580,23 @@ def plot_ans_perc(eval_df, gt_df, labels=None):
     for i, (df, label) in enumerate(zip(eval_df, labels)):
         samples_per_label[label] = len(df)
         for q_type in question_types:
-            total = gt_df.index.str.startswith(q_type).sum()
-            answered_count = len(df[df.index.str.startswith(q_type)])
+            # More robust filtering - handle case sensitivity and exact matching
+            gt_mask = gt_df.index.str.startswith(q_type)
+            total = gt_mask.sum()
+            
+            # Ensure df has an index to work with
+            if hasattr(df, 'index'):
+                eval_mask = df.index.str.startswith(q_type)
+                answered_count = eval_mask.sum()
+            else:
+                # Fallback if df doesn't have proper index
+                answered_count = 0
+                
             percentage = (answered_count / total) * 100 if total > 0 else 0
+            
+            # Debug print to help identify the issue
+            print(f"Debug - {label}, {q_type}: total={total}, answered={answered_count}, percentage={percentage:.1f}%")
+            
             summary_data.append(
                 {"Question type": q_type, "Answered": percentage, "Label": label}
             )
@@ -571,9 +606,10 @@ def plot_ans_perc(eval_df, gt_df, labels=None):
 
     summary_df = pd.DataFrame(summary_data)
 
-    # 2. --- Visualization ---
+    # 2. --- Visualization Setup ---
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(12, 7))
+    # Standard figure width since legend won't be on the side
+    fig, ax = plt.subplots(figsize=(16, 9))
 
     if is_list:
         palette = sns.color_palette(n_colors=len(eval_df))
@@ -585,42 +621,12 @@ def plot_ans_perc(eval_df, gt_df, labels=None):
             palette=palette,
             ax=ax,
         )
-        for i, (label, avg_perc) in enumerate(average_percentages.items()):
-            ax.axhline(
-                y=avg_perc, color=palette[i % len(palette)], linestyle="--", linewidth=1
-            )
-            ax.text(
-                3.6,
-                avg_perc,
-                f"Avg ({label}): {avg_perc:.2f}%",
-                va="center",
-                ha="right",
-                fontsize=10,
-                color=palette[i % len(palette)],
-                bbox=dict(
-                    boxstyle="round,pad=0.3",
-                    fc="white",
-                    ec=palette[i % len(palette)],
-                    lw=1,
-                ),
-            )
     else:
         sns.barplot(
             x="Question type", y="Answered", data=summary_df, color="Green", ax=ax
         )
-        label, avg_perc = list(average_percentages.items())[0]
-        ax.axhline(y=avg_perc, color="#ff0000", linestyle="--", linewidth=1)
-        ax.text(
-            3.5,
-            avg_perc,
-            f"Avg: {avg_perc:.2f}%",
-            va="center",
-            ha="right",
-            fontsize=11,
-            color="#ff0000",
-            bbox=dict(color="#ffffff", edgecolor="#ff0000", pad=0.2),
-        )
 
+    # 3. --- Add percentage annotations on bars ---
     for p in ax.patches:
         ax.annotate(
             f"{p.get_height():.1f}%",
@@ -632,22 +638,56 @@ def plot_ans_perc(eval_df, gt_df, labels=None):
             xytext=(0, 5),
         )
 
-    # 3. --- Polishing ---
-    title = (
-        "Answered Questions Comparison"
-        if is_list
-        else "Percentage of Questions Answered"
-    )
-    ax.text(
-        -0.5,
-        118,
-        f"{title} by Type",
-        fontsize=20,
-        fontweight="bold",
-        ha="left",
-    )
+    # 4. --- Create separated average section with grey line ---
+    # Add vertical grey line to separate main chart from average section (thinner)
+    ax.axvline(x=3.7, color='gray', linestyle='-', linewidth=1, alpha=0.5)
+
+    # Plot average bars in the separated section
+    for i, (label, avg_perc) in enumerate(average_percentages.items()):
+        if is_list:
+            # For multiple models, create small bars showing averages
+            bar_width = 0.6 / len(average_percentages) if len(average_percentages) > 1 else 0.3
+            x_position = 4.1 + (i - (len(average_percentages) - 1) / 2) * bar_width
+            
+            # Create average bar with same color as corresponding model
+            color = palette[i % len(palette)]
+            ax.bar(x_position, avg_perc, width=bar_width, color=color, alpha=0.8)
+            
+            # Add percentage label on top of average bar
+            ax.annotate(
+                f"{avg_perc:.1f}%",
+                (x_position, avg_perc),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                textcoords="offset points",
+                xytext=(0, 5),
+            )
+        else:
+            # For single model, create one average bar
+            ax.bar(4.1, avg_perc, width=0.3, color="Green", alpha=0.8)
+            ax.annotate(
+                f"{avg_perc:.1f}%",
+                (4.1, avg_perc),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                textcoords="offset points",
+                xytext=(0, 5),
+            )
+
+    # 5. --- Title and Subtitle ---
+    title = "Percentage of Answered Questions"
 
     if not is_list:
+        ax.text(
+            x=0.5,
+            y=118,
+            s=f"{title} by Type",
+            fontsize=16,
+            fontweight="bold",
+            ha="left",
+        )
         sample_count = samples_per_label[labels[0]]
         ax.text(
             -0.5,
@@ -658,23 +698,50 @@ def plot_ans_perc(eval_df, gt_df, labels=None):
             style="italic",
             color="#666666",
         )
+    else:
+        ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
 
-    ax.set_xlabel("")
+    # 6. --- Axis formatting ---
+    ax.set_xlabel('Question Type', fontsize=12)
     ax.set_ylabel("Answered", fontsize=12, labelpad=15)
     ax.set_ylim(0, 105)
     ax.set_yticks(range(0, 101, 20))
     ax.set_yticklabels([f"{y}%" for y in range(0, 101, 20)])
+    
+    # Extend x-axis to accommodate the average section
+    ax.set_xlim(-0.5, 4.5)
+    
+    # Update x-tick labels to include average section
+    original_labels = question_types + ["Average"]
+    ax.set_xticks(list(range(len(question_types))) + [4.1])
+    ax.set_xticklabels(original_labels)
+    
     ax.tick_params(axis="x", length=0)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
+    # 7. --- Legend positioning (top right quadrant with white background) ---
     if is_list:
         legend = ax.get_legend()
         if legend:
-            legend.set_title("Label")
+            # Get the original legend handles (which contain the color information)
+            original_handles = legend.legend_handles
+            
+            # Remove the old legend first
+            legend.remove()
+            
+            # Create new legend labels with sample counts, preserving original handles
+            legend_labels = []
             for i, label in enumerate(labels):
                 sample_count = samples_per_label[label]
-                legend.texts[i].set_text(f"{label} (n_questions={sample_count})")
+                legend_labels.append(f"{label} (n_questions={sample_count})")
+            
+            # Position legend in the top right quadrant with white background
+            legend = ax.legend(original_handles, legend_labels, title="Models", 
+                             loc='lower right', 
+                             frameon=True, fancybox=True, 
+                             facecolor='white', edgecolor='gray',
+                             framealpha=1.0)
 
-    plt.tight_layout()
-    plt.show()
+    
+    return fig
