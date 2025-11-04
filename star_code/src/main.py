@@ -448,19 +448,26 @@ def stream_sgg(
 
     # Helper function for the pipeline to distiniguish what do if batch_images is set
     def _stream_batch_condition(stream):
-        for obj in stream:
-            content = obj["response"]["content"]
-            if batch_images:
+        if batch_images:
+            for obj in stream:
+                content = obj["response"]["content"]
                 # Introduce spurious modifier to satisfy GeneratedGraphFormatter interface
                 yield {**obj, "stsg": content}
-            else:
-                # Map each object to include 'sg', then aggregate the mapped stream
-                mapped = (
-                    {**obj, "sg": graph_gen.extract_frame_description(obj["response"]["content"])}
-                    for obj in stream
-                )
-                # now let the aggregator generate the stream
-                yield from graph_gen.frame_aggregator(mapped)
+        else:
+            # Map each object to include 'sg', then aggregate the mapped stream.
+            # The mapping happens before the aggregation to avoid consuming the first
+            # element of the stream and silently dropping it from the aggregation.
+            mapped = (
+                {
+                    **obj,
+                    "sg": graph_gen.extract_frame_description(
+                        obj["response"]["content"]
+                    ),
+                }
+                for obj in stream
+            )
+            # now let the aggregator generate the stream
+            yield from graph_gen.frame_aggregator(mapped)
 
     bp = batch_processor
     pipeline = bp.Pipeline(
