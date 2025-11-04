@@ -3,7 +3,7 @@ disable_existing_loggers: False # Keep existing loggers if any
 
 formatters:
   bare-bones:
-    format: '[%(levelname)s] : %(message)s'
+    format: '[%(asctime)s - %(levelname)s] : %(message)s'
   simple:
     format: '[%(asctime)s - %(name)s - %(levelname)s] : %(message)s'
   verbose:
