@@ -27,3 +27,7 @@ nltk_data
 
 # ignore private.env files - may contain sensible data
 *private.env
+
+# ignore images
+**/*.svg
+**/*.png
