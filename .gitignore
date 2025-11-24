@@ -27,3 +27,12 @@ nltk_data
 
 # ignore private.env files - may contain sensible data
 *private.env
+
+# ignore images
+**/*.svg
+**/*.png
+
+# scripts outputs
+star_code/scripts/**
+!star_code/scripts/**.py
+!star_code/scripts/**.sh

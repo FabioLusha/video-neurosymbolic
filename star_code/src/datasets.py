@@ -218,7 +218,7 @@ class STARDataset(PromptDataset):
                 question_id = sample["question_id"]
                 stsg = self.stsgs.get(question_id, None)
                 if not stsg:
-                    logger.warn(f"{question_id:<20}: STSG not found or null-string.")
+                    logger.warning(f"{question_id:<20}: STSG not found or null-string.")
                     continue
 
                 sample["stsg"] = stsg

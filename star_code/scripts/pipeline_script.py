@@ -1,82 +1,115 @@
 import asyncio
-import sys
 import json
-from pathlib import Path
 import logging
+import sys
+from pathlib import Path
 
 import gemini_batch_creation
 import gemini_batch_processing
 
 logger = logging.getLogger("experiment")
 
+SRC_DIR = Path(__file__).resolve().parent.parent.resolve()
+
+
 def main(client):
+    chunks_filenames = []
+    finished_filenames = []
+
+    # To be used when some of the chunk fail
+    chunks_filenames = [
+      Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00_chunk_04.jsonl")
+    ]
+
+    finished_filenames = [
+        Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_02_2nd_chat_history.jsonl"),
+        Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_03_2nd_chat_history.jsonl"),
+    ]
+
+    chunks_filenames = [str(i) for i in chunks_filenames if i.with_stem(f"{i.stem}_2nd_chat_history") not in finished_filenames]
+    finished_filenames = [str(i) for i in finished_filenames]
 
     # ===========================================================================
-    #
+    # ===========================================================================
+    # ===========================================================================
+
     # task = "vqa"
-    #
-    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
     # stsg_file = None
-    #
-    # limit_n = 200
-    # n_chunks = 4
+
+    # limit_n = None
+    # n_chunks = 10
     # user_prompt = "../data/prompts/vqa/user_prompt.txt"
     # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
     # fps = 1
     # max_frames = 64
-    # output_file = "../scripts/data/vqa_gemini_flash.jsonl"
-    #
-    # reply_file = "../data/prompts/graph-gen/format_instructions_v2corrected.txt"
-    #
+    # output_file = "../scripts/data/vqa_gemini2.5flash_ongerOutTokens_20250829_18:43:00.jsonl"
+
+    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+
     # ===========================================================================
 
     # task = "sgg"
-    #
-    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+
+    # # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
+    # # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+    # input_dataset = str(
+    #     SRC_DIR / "data/datasets/STAR/STAR_annotations/STAR_val_part7.json"
+    # )
     # stsg_file = None
-    #
-    # limit_n = 200
-    # n_chunks = 2
-    # user_prompt = "../data/prompts/graph-gen/user_prompt_v2_gemini.txt"
-    # videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+
+    # limit_n = None
+    # n_chunks = 10
+    # user_prompt = str(SRC_DIR / "data/prompts/graph-gen/user_prompt_v2_gemini.txt")
+    # videos_dir = str(SRC_DIR / "data/datasets/action-genome/Charades_v1_480")
     # fps = 1
     # max_frames = 64
-    # output_file = "../scripts/data/sgg_gemini2.5flash.jsonl"
-    #
-    # # vqa or graph-understanding
-    # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
+    # output_file = "/megaverse/storage/lusha/valset_sgg/sgg_gemini2.5flash_val_part7_OutTokens8192_20250913_09:25:00.jsonl"
+
+    # reply_file = str(
+    #     SRC_DIR / "data/prompts/graph-gen/format_instructions_v2corrected.txt"
+    # )
 
     # ===========================================================================
 
     task = "graph-understanding"
 
-    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
-    stsg_file = "data/aggregated_final_sgg_200.jsonl"
-    limit_n = 200
-    n_chunks = 2
+    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_part2.json"
+    # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
+
+    # stsg_file = "data/sgg_gemini2.5flash_1000_20250824_20:00:00_aggregated.jsonl"
+    # stsg_file = "data/aggregated_final_sgg_gemini2.5flash_1000_OutTokens8192_20250829_22:00:00.jsonl"
+    stsg_file = "/megaverse/storage/lusha/valset_sgg/aggregated_final_sgg_gemini2.5flash_val_part2_OutTokens8192_20250913_09:25:00.jsonl"
+
+    # GT STSG
+    # stsg_file = "../data/datasets/STAR_verbalized_stsg_val.json"
+
+    limit_n = None
+    n_chunks = 5
     user_prompt = "../data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v3.txt"
     videos_dir = "../data/datasets/action-genome/Charades_v1_480"
     fps = 1
     max_frames = 64
-    output_file = "../scripts/data/gu_u3_on_geminiSGG_gemini2.5flash_20250804_21:49:00.jsonl"
-
+    output_file = "/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00.jsonl"
     # vqa or graph-understanding
     reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
 
     # ===========================================================================
 
-    chunks_filenames = gemini_batch_creation.preprocess_dataset_to_request(
-        input_dataset_path=input_dataset,
-        stsg_file_path=stsg_file,
-        task=task,
-        user_prompt_path=user_prompt,
-        videos_dir=videos_dir,
-        fps=fps,
-        max_frames=max_frames,
-        output_file_path=output_file,
-        limit_n=limit_n,
-        n_chunks=n_chunks,
-    )
+    if not chunks_filenames:
+        chunks_filenames = gemini_batch_creation.preprocess_dataset_to_request(
+            input_dataset_path=input_dataset,
+            stsg_file_path=stsg_file,
+            task=task,
+            user_prompt_path=user_prompt,
+            videos_dir=videos_dir,
+            fps=fps,
+            max_frames=max_frames,
+            output_file_path=output_file,
+            limit_n=limit_n,
+            n_chunks=n_chunks,
+        )
 
     # sgg
     model_name = "gemini-2.5-flash"
@@ -88,6 +121,9 @@ def main(client):
             *chunks_filenames,
         )
     )
+
+    results += finished_filenames
+
     logger.info("Aggregating chunked results.")
     concat = []
     for result in results:
@@ -100,12 +136,17 @@ def main(client):
     if task == "sgg":
         filtered_entries = []
         for entry in concat:
-            entry["question_id"] = entry["key"]
             try:
-                entry["stsg"] = entry["request"]["contents"][-1]["parts"][0]["text"]
-                filtered_entries.append(entry)
+                stsg = entry["request"]["contents"][-1]["parts"][0]["text"]
             except Exception:
+                logger.error(
+                    f"Error while extracting stsg for key {entry['key']}. Skipping..."
+                )
                 continue
+
+            entry["stsg"] = stsg
+            entry["question_id"] = entry["key"]
+            filtered_entries.append(entry)
         concat = filtered_entries
 
     out_path = Path(output_file)
