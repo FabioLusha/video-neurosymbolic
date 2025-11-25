@@ -66,7 +66,10 @@ All modules use pre-configured prompts tailored for their specific tasks to ensu
 
    ```bash
    cd dev_container
-   docker build --build-arg USER=$USER -t lusha/pydev .
+   docker build \
+      --build-arg USERNAME="$USER" \
+      --build-arg USER_UID="$(id -u)" \
+      -t "$USER"_pydev2 .
    ```
 
 2. Run the container:
