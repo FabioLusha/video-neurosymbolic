@@ -16,23 +16,25 @@ def main(client):
     chunks_filenames = []
     finished_filenames = []
 
-    # To be used when some of the chunk fail
-    chunks_filenames = [
-      Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00_chunk_04.jsonl")
-    ]
+    # ===========================================================================
+    # To be used when some of the chunk fails
+    # ===========================================================================
+    #
+    # chunks_filenames = [
+    #   Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00_chunk_04.jsonl")
+    # ]
+    #
+    # finished_filenames = [
+    #     Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_02_2nd_chat_history.jsonl"),
+    #     Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_03_2nd_chat_history.jsonl"),
+    # ]
+    # 
+    # chunks_filenames = [str(i) for i in chunks_filenames if i.with_stem(f"{i.stem}_2nd_chat_history") not in finished_filenames]
+    # finished_filenames = [str(i) for i in finished_filenames]
 
-    finished_filenames = [
-        Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_02_2nd_chat_history.jsonl"),
-        Path("/megaverse/storage/lusha/graph_und/gu_gemini_val_part7_20250917_08:18:00_chunk_03_2nd_chat_history.jsonl"),
-    ]
 
-    chunks_filenames = [str(i) for i in chunks_filenames if i.with_stem(f"{i.stem}_2nd_chat_history") not in finished_filenames]
-    finished_filenames = [str(i) for i in finished_filenames]
 
     # ===========================================================================
-    # ===========================================================================
-    # ===========================================================================
-
     # task = "vqa"
 
     # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_1000.json"
@@ -48,6 +50,7 @@ def main(client):
 
     # reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
 
+    # model_name = "gemini-2.5-flash"
     # ===========================================================================
 
     # task = "sgg"
@@ -71,30 +74,36 @@ def main(client):
     #     SRC_DIR / "data/prompts/graph-gen/format_instructions_v2corrected.txt"
     # )
 
+    # model_name = "gemini-2.5-flash"
     # ===========================================================================
 
     task = "graph-understanding"
 
-    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_part2.json"
+    input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
     # input_dataset = "../data/datasets/STAR/STAR_annotations/STAR_val_small_200.json"
 
-    # stsg_file = "data/sgg_gemini2.5flash_1000_20250824_20:00:00_aggregated.jsonl"
-    # stsg_file = "data/aggregated_final_sgg_gemini2.5flash_1000_OutTokens8192_20250829_22:00:00.jsonl"
+    # The file containing the STSG associated to each video or question
     stsg_file = "/megaverse/storage/lusha/valset_sgg/aggregated_final_sgg_gemini2.5flash_val_part2_OutTokens8192_20250913_09:25:00.jsonl"
 
     # GT STSG
-    # stsg_file = "../data/datasets/STAR_verbalized_stsg_val.json"
+    stsg_file = "../data/datasets/STAR_verbalized_stsg_val.json"
 
+    # set limit_n != None if you want limit the processing to the first `limit_n` instances of the dataset
     limit_n = None
+    # in how many batch-files to divide the dataset
     n_chunks = 5
+    # path to the user prompt template
     user_prompt = "../data/prompts/zero-shot-cot/MCQ_user_prompt_ZS_CoT_v3.txt"
     videos_dir = "../data/datasets/action-genome/Charades_v1_480"
+    # sampling rate
     fps = 1
+    # maximum number of frames to extract
     max_frames = 64
-    output_file = "/megaverse/storage/lusha/graph_und/gu_gemini_val_part2bis_20250917_08:18:00.jsonl"
-    # vqa or graph-understanding
+    output_file = "tmp/test_output.jsonl"
     reply_file = "../data/prompts/zero-shot-cot/auto_reply_ZS_CoT.txt"
 
+    # model name from the one provided by Gemini
+    model_name = "gemini-2.5-flash"
     # ===========================================================================
 
     if not chunks_filenames:
@@ -111,8 +120,6 @@ def main(client):
             n_chunks=n_chunks,
         )
 
-    # sgg
-    model_name = "gemini-2.5-flash"
     results = asyncio.run(
         gemini_batch_processing.zero_shot_cot_batch_pipeline(
             client,

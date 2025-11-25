@@ -4,7 +4,7 @@ networks:
 
 services:
   env_container:
-    image: lusha/pydev2
+    image: {$USER}/pydev2
     container_name: ${USER}_pydev2
     env_file:
       - .env
@@ -21,11 +21,12 @@ services:
       - /multiverse/datasets/shared/action-genome:/home/${USER}/star_code/data/datasets/action-genome
       - /multiverse/datasets/shared/action-genome/Charades_v1_480:/home/${USER}/star_code/data/datasets/action-genome/Charades_v1_480
       - /multiverse/datasets/shared/STAR:/home/${USER}/star_code/data/datasets/STAR
+      - /megaverse:/megaverse
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               capabilities: [gpu]
-              device_ids: ["2","3"]
-    cpuset: "12-19"
+              device_ids: [""]
+    cpuset: "12-15"
