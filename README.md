@@ -2,6 +2,13 @@
 
 A comprehensive toolkit for generating and understanding sYpatio-temporal scene graphs (STSG) using Ollama-powered language models, with support for Visual Question Answering (VQA) tasks.
 
+## Table of contents
+- [Gemini pipeline](docs/README_manual.md)
+- [Tutorial on how to extract descriptions and scene graphs of videos](star_code/tutorials/load_sgg_chat_history.ipynb)
+
+
+Continue with the README for the Ollama implementation
+
 ## Features
 
 - Generate spatio-temporal scene graphs from video content
