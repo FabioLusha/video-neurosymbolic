@@ -4,7 +4,7 @@ networks:
 
 services:
   env_container:
-    image: {$USER}/pydev2
+    image: ${USER}/pydev2
     container_name: ${USER}_pydev2
     env_file:
       - .env
