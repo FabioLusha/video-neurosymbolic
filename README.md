@@ -1,6 +1,6 @@
 # STAR Ollama Toolkit
 
-A comprehensive toolkit for generating and understanding sYpatio-temporal scene graphs (STSG) using Ollama-powered language models, with support for Visual Question Answering (VQA) tasks.
+A comprehensive toolkit for generating and understanding spatio-temporal scene graphs (STSG) using Ollama-powered language models, with support for Visual Question Answering (VQA) tasks.
 
 ## Table of contents
 - [Gemini pipeline](docs/README_manual.md)
